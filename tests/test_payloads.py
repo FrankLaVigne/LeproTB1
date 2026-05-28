@@ -57,3 +57,41 @@ def test_build_effect_payload_unknown_raises():
     import pytest
     with pytest.raises(ValueError):
         lepro._build_effect_payload("nope")
+
+
+import pytest
+
+
+class _FakeMQTT:
+    def __init__(self):
+        self.published = []
+
+    async def publish(self, topic, payload):
+        self.published.append((topic, payload))
+
+
+def _client_with_fake_mqtt():
+    c = lepro.LeproClient.__new__(lepro.LeproClient)  # bypass __init__/network
+    c._mqtt = _FakeMQTT()
+    c.devices = [lepro.Device(did="111", fid="f", name="lamp", series="TB1")]
+    return c
+
+
+@pytest.mark.asyncio
+async def test_set_effect_publishes_to_set_topic():
+    import json
+    c = _client_with_fake_mqtt()
+    await c.set_effect("flash", speed=70)
+    topic, payload = c._mqtt.published[-1]
+    assert topic == "le/111/prp/set"
+    d = json.loads(payload)["d"]
+    assert d["d2"] == 3 and d["d60"].startswith("2000064")
+
+
+@pytest.mark.asyncio
+async def test_set_segments_publishes_d50():
+    import json
+    c = _client_with_fake_mqtt()
+    await c.set_segments([(255, 0, 0), (0, 0, 255)])
+    d = json.loads(c._mqtt.published[-1][1])["d"]
+    assert d["d2"] == 2 and d["d50"].startswith("N01:P10002")

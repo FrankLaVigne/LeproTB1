@@ -469,6 +469,16 @@ class LeproClient:
                 d["d52"] = max(0, min(1000, int(round(pct * 10))))
             await self._publish(dev.did, d)
 
+    async def set_effect(self, name: str, speed: int = 50, color=(255, 255, 255),
+                         pct: int | None = None, did: str | None = None) -> None:
+        """Run a named firmware effect (see lepro.EFFECTS)."""
+        await self._publish(self._dev(did).did, _build_effect_payload(name, speed, color, pct))
+
+    async def set_segments(self, colors, did: str | None = None) -> None:
+        """Set up to 25 RGB segment-groups across the rings (solid, no motion)."""
+        d = {"d1": 1, "d2": 2, "d50": _build_d50(colors, "solid")}
+        await self._publish(self._dev(did).did, d)
+
     async def send_raw(self, d: dict, did: str | None = None) -> None:
         """Escape hatch: send an arbitrary 'd' payload (for protocol exploration)."""
         await self._publish(self._dev(did).did, d)
