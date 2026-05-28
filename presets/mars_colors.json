@@ -1,0 +1,10 @@
+{
+  "name": "mars_colors",
+  "description": "Lepro AI prompt: 'mars colors' — pulsing/breathing between two warm orange/red tones, alternating segments.",
+  "captured": "2026-05-28",
+  "payload": {
+    "d1": 1,
+    "d2": 2,
+    "d50": "N02:P10006FF8000FFAC59BF6000800000BF6000FFBF00U4T2X5F2000040201040103010501E401c2000001c20064I70384O60a8c;P600U4T2X5F20000204010601E40000000005460064I70546V3030640000O60a8c;"
+  }
+}
