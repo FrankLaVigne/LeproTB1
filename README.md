@@ -20,6 +20,10 @@ The protocol was reverse-engineered with help from the excellent
 [`Sanji78/lepro_led`](https://github.com/Sanji78/lepro_led) Home Assistant
 integration.
 
+> **If you don't provide an API, we will figure it out on our own.**
+>
+> ![Can't stop the signal, Mal — Mr. Universe, Serenity (2005)](assets/cant-stop-the-signal.gif)
+
 ## Setup
 
 ```bash
