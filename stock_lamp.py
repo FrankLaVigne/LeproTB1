@@ -49,6 +49,15 @@ def decide_command(prev_price: float | None,
     return None if desired == last_command else desired
 
 
+async def apply_command(client, cmd: Command) -> None:
+    """Dispatch a Command to the lamp: animate -> breath effect, solid -> set_color."""
+    kind, color = cmd
+    if kind == "animate":
+        await client.set_effect("breath", speed=50, color=color)
+    else:  # "solid"
+        await client.set_color(*color)
+
+
 def fetch_price(symbol: str) -> float | None:
     """Return the latest known price for `symbol`, or None on any error.
 
