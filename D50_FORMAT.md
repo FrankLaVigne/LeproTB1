@@ -98,6 +98,36 @@ implementation now that the boundary is proven.
 
 ---
 
+## The `#V:` topology prefix (experimentally confirmed)
+
+Per-ring captures consistently start with `#V:` followed by three structured
+blocks. Decoding the bytes:
+
+```
+#V:0358c4...  003ec4...  002ec4...
+```
+
+| Hex byte | Decimal | What it matches |
+|---|---|---|
+| `0x58` | 88  | outer ring LED count |
+| `0x3e` | 62  | middle ring LED count |
+| `0x2e` | 46  | inner ring LED count |
+| `0xc4` | 196 | total LED count (88+62+46) |
+| `0x03` | 3   | total ring count (leading byte of block 1) |
+
+The match against the TB1's published spec (88 + 62 + 46 = 196) is exact and on
+every per-ring capture we've taken. The `#V:` prefix is the firmware's **ring
+topology declaration** — it sets up "ring 0 has 88 LEDs, ring 1 has 62, ring 2
+has 46, total 196" before the per-ring `#I00/01/02` programs run.
+
+This was credited as a confirmation rather than a hypothesis because every byte
+above is empirically present in every per-ring capture, and the values are not
+generic numbers — they're the exact LED ring sizes of *this specific lamp*.
+
+The trailing bytes in each block (`c4 00 00 ...`) appear to be per-animation
+timing/state that varies between captures. Decoding those is a future
+iteration; the structural layout (ring topology) is locked.
+
 ## The phase-offset finding (high confidence — and new)
 
 The `hulk.json` capture has these three per-ring blocks:
