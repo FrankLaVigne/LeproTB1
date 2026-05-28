@@ -75,3 +75,24 @@ async def test_run_tolerates_fetch_failure_and_continues():
 
     # Failed first call → skipped. Baseline 100. Uptick to 100.5 → green. Flat → no call.
     assert client.calls == [(0, 255, 0)]
+
+
+import argparse
+
+
+def test_interval_accepts_floor():
+    assert stock_lamp._interval("5") == 5
+
+
+def test_interval_accepts_larger():
+    assert stock_lamp._interval("30") == 30
+
+
+def test_interval_rejects_below_floor():
+    with pytest.raises(argparse.ArgumentTypeError):
+        stock_lamp._interval("4")
+
+
+def test_interval_rejects_non_integer():
+    with pytest.raises(argparse.ArgumentTypeError):
+        stock_lamp._interval("nope")

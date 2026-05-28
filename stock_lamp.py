@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
+import sys
 from datetime import datetime
 
 import yfinance as yf
@@ -63,3 +65,56 @@ async def run(symbol: str, interval: float, client, fetch_fn=fetch_price) -> Non
                     print(f"warn: lamp publish failed: {e}")
             prev = now
         await asyncio.sleep(interval)
+
+
+from lepro import LeproClient, load_config
+
+
+def _interval(value: str) -> int:
+    try:
+        n = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"interval must be an integer, got {value!r}")
+    if n < 5:
+        raise argparse.ArgumentTypeError(f"interval must be >= 5 (got {n})")
+    return n
+
+
+async def _run_main(symbol: str, interval: int) -> int:
+    cfg = load_config()
+    if not cfg["account"] or not cfg["password"]:
+        print("Missing credentials. Create config.json or set LEPRO_ACCOUNT / LEPRO_PASSWORD.",
+              file=sys.stderr)
+        return 2
+
+    # First sample up front so a bad symbol exits cleanly before we open MQTT.
+    first = await asyncio.to_thread(fetch_price, symbol)
+    if first is None:
+        print(f"error: could not fetch price for {symbol!r} on first try", file=sys.stderr)
+        return 1
+
+    client = LeproClient(cfg["account"], cfg["password"], cfg["region"])
+    await client.login()
+    await client.connect_mqtt()
+    try:
+        await run(symbol, interval, client)
+    finally:
+        await client.close()
+    return 0
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description="Color the lamp green on uptick / red on downtick.")
+    p.add_argument("symbol", help="Yahoo ticker, e.g. IBM, 7203.T, BBVA.MC")
+    p.add_argument("--interval", type=_interval, default=30,
+                   help="seconds between polls (minimum 5; default 30)")
+    args = p.parse_args()
+    try:
+        sys.exit(asyncio.run(_run_main(args.symbol, args.interval)))
+    except KeyboardInterrupt:
+        print()  # newline after the ^C
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
