@@ -30,6 +30,7 @@ class BearerAuthMiddleware:
 
 import asyncio
 import contextlib
+import functools
 import logging
 import sys
 
@@ -46,7 +47,7 @@ _client: LeproClient | None = None
 _players: dict[str, AnimationPlayer] = {}
 
 
-def _player_for(did: str) -> AnimationPlayer:
+def _player_for(did: str | None) -> AnimationPlayer:
     dev = _client._dev(did)  # raises LeproError on unknown id
     if dev.did not in _players:
         _players[dev.did] = AnimationPlayer(_client, dev)
@@ -68,6 +69,8 @@ async def _lifespan(_server: FastMCP):
         yield
     finally:
         listener.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await listener
         for p in _players.values():
             await p.stop()
         await _client.close()
@@ -81,13 +84,17 @@ def _ok(did: str | None, **extra) -> dict:
 
 
 def _guard(fn):
-    """Wrap a tool coroutine so LeproError/ValueError return structured errors."""
-    async def wrapped(**kwargs):
+    """Wrap a tool coroutine so LeproError/ValueError return structured errors.
+
+    functools.wraps sets __wrapped__ so FastMCP's inspect.signature still sees the
+    real parameters (otherwise every tool's schema collapses to a single kwargs arg).
+    """
+    @functools.wraps(fn)
+    async def wrapped(*args, **kwargs):
         try:
-            return await fn(**kwargs)
+            return await fn(*args, **kwargs)
         except (LeproError, ValueError, KeyError) as e:
             return {"ok": False, "error": str(e)}
-    wrapped.__name__ = fn.__name__
     return wrapped
 
 
@@ -154,9 +161,9 @@ async def set_segments(colors: list[list[int]], did: str | None = None) -> dict:
 
 @mcp.tool()
 @_guard
-async def play_animation(frames: list[dict], repeat: bool = False, did: str | None = None) -> dict:
+async def play_animation(frames: list[dict], repeat: bool | int = False, did: str | None = None) -> dict:
     """Play a choreographed animation. Each frame: {color|segments|brightness, duration_ms>=80}."""
-    await _player_for(_client._dev(did).did).play(frames, repeat)
+    await _player_for(did).play(frames, repeat)
     return _ok(did, frames=len(frames), repeat=repeat)
 
 
@@ -164,7 +171,7 @@ async def play_animation(frames: list[dict], repeat: bool = False, did: str | No
 @_guard
 async def stop_animation(did: str | None = None) -> dict:
     """Stop any running animation on the light."""
-    await _player_for(_client._dev(did).did).stop()
+    await _player_for(did).stop()
     return _ok(did)
 
 
