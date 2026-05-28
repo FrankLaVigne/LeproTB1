@@ -98,6 +98,58 @@ def _speed_to_hex(speed: int) -> str:
     return f"0{raw:03X}"
 
 
+def _effect_tail(effect: str, sp: str) -> str:
+    """Return the d50 trailing segment encoding the named effect at speed-hex `sp`."""
+    return {
+        "solid": "000640000E1",
+        "breath": f"000640000E4{sp}0000{sp}1664",
+        "gradient": f"100640000E3{sp}C2O6{sp}",
+        "clockwise": f"00164{sp}E1",
+        "counterclockwise": f"00264{sp}E1",
+        "circular": f"100640000E1C2O6{sp}",
+    }[effect]
+
+
+def _build_d50(segment_colors, effect: str = "solid", speed: int = 50) -> str:
+    """Build the grouped d50 string from up to 25 RGB segments + an effect."""
+    groups: list[list] = []
+    for col in segment_colors:
+        col = tuple(int(c) for c in col)
+        if groups and groups[-1][0] == col:
+            groups[-1][1] += 1
+        else:
+            groups.append([col, 1])
+    total = sum(g[1] for g in groups)
+    if total < 25:
+        groups[-1][1] += 25 - total
+    while sum(g[1] for g in groups) > 25:
+        excess = sum(g[1] for g in groups) - 25
+        if groups[-1][1] > excess:
+            groups[-1][1] -= excess
+        else:
+            groups.pop()
+    num = len(groups)
+    colors_str = "".join(f"{r:02X}{g:02X}{b:02X}" for (r, g, b), _ in groups)
+    lengths_str = "".join(f"{cnt:04X}" for _, cnt in groups)
+    tail = _effect_tail(effect, _speed_to_hex(speed))
+    return f"N01:P1000{num}{colors_str}F21000{num}{lengths_str}U3V3{tail};"
+
+
+def _build_effect_payload(name: str, speed: int = 50, color=(255, 255, 255),
+                          pct: int | None = None) -> dict:
+    """Build the MQTT 'd' payload for a named effect (d50 family or d60 special)."""
+    if name in _D60_SPECIAL:
+        sens = max(0, min(0x63, round(max(0, min(100, speed)) * 0x63 / 100)))
+        d = {"d1": 1, "d2": 3, "d60": f"{_D60_SPECIAL[name]}{sens:02X}0000"}
+    elif name in _D50_EFFECTS:
+        d = {"d1": 1, "d2": 2, "d50": _build_d50([color] * 25, name, speed)}
+    else:
+        raise ValueError(f"unknown effect {name!r}; see lepro.EFFECTS")
+    if pct is not None:
+        d["d52"] = max(0, min(1000, int(round(pct * 10))))
+    return d
+
+
 @dataclass
 class Device:
     did: str
