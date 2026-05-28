@@ -9,20 +9,82 @@ import pytest
 import stock_lamp
 
 
-def test_decide_color_first_sample_returns_none():
-    assert stock_lamp.decide_color(None, 100.0) is None
+# --- decide_command tests ------------------------------------------------------
+
+G = (0, 255, 0)
+R = (255, 0, 0)
+Y = (255, 255, 0)
+ANIMATE_G = ("animate", G)
+ANIMATE_R = ("animate", R)
+SOLID_G = ("solid", G)
+SOLID_R = ("solid", R)
+SOLID_Y = ("solid", Y)
 
 
-def test_decide_color_uptick_returns_green():
-    assert stock_lamp.decide_color(100.0, 100.5) == (0, 255, 0)
+def test_decide_command_baseline_returns_none():
+    assert stock_lamp.decide_command(None, 100.0, None) is None
 
 
-def test_decide_color_downtick_returns_red():
-    assert stock_lamp.decide_color(100.0, 99.9) == (255, 0, 0)
+def test_decide_command_uptick_from_cold_animates_green():
+    assert stock_lamp.decide_command(100.0, 100.5, None) == ANIMATE_G
 
 
-def test_decide_color_flat_returns_none():
-    assert stock_lamp.decide_color(100.0, 100.0) is None
+def test_decide_command_uptick_dedup_when_already_animating_green():
+    assert stock_lamp.decide_command(100.0, 100.5, ANIMATE_G) is None
+
+
+def test_decide_command_downtick_from_cold_animates_red():
+    assert stock_lamp.decide_command(100.0, 99.5, None) == ANIMATE_R
+
+
+def test_decide_command_downtick_dedup_when_already_animating_red():
+    assert stock_lamp.decide_command(100.0, 99.5, ANIMATE_R) is None
+
+
+def test_decide_command_downtick_after_animate_green_animates_red():
+    assert stock_lamp.decide_command(100.0, 99.5, ANIMATE_G) == ANIMATE_R
+
+
+def test_decide_command_flat_after_animate_green_calms_to_solid_green():
+    assert stock_lamp.decide_command(100.0, 100.0, ANIMATE_G) == SOLID_G
+
+
+def test_decide_command_flat_after_animate_red_calms_to_solid_red():
+    assert stock_lamp.decide_command(100.0, 100.0, ANIMATE_R) == SOLID_R
+
+
+def test_decide_command_flat_after_solid_returns_none():
+    assert stock_lamp.decide_command(100.0, 100.0, SOLID_G) is None
+
+
+def test_decide_command_flat_from_cold_returns_none():
+    assert stock_lamp.decide_command(100.0, 100.0, None) is None
+
+
+def test_decide_command_uptick_after_solid_red_animates_green():
+    assert stock_lamp.decide_command(100.0, 100.5, SOLID_R) == ANIMATE_G
+
+
+def test_decide_command_fetch_failure_from_cold_goes_yellow():
+    assert stock_lamp.decide_command(None, None, None) == SOLID_Y
+
+
+def test_decide_command_fetch_failure_from_running_goes_yellow():
+    assert stock_lamp.decide_command(100.0, None, ANIMATE_G) == SOLID_Y
+
+
+def test_decide_command_fetch_failure_dedup_when_already_yellow():
+    assert stock_lamp.decide_command(100.0, None, SOLID_Y) is None
+
+
+def test_decide_command_recovery_with_uptick_after_yellow():
+    # prev_price was 100.0, price moved during outage, first recovered poll is 100.5
+    assert stock_lamp.decide_command(100.0, 100.5, SOLID_Y) == ANIMATE_G
+
+
+def test_decide_command_recovery_flat_after_yellow_stays_silent():
+    # prev was 100.0, came back at exactly 100.0 → no real tick, lamp stays yellow
+    assert stock_lamp.decide_command(100.0, 100.0, SOLID_Y) is None
 
 
 class _FakeClient:

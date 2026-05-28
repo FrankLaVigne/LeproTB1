@@ -21,17 +21,32 @@ RED = (255, 0, 0)
 YELLOW = (255, 255, 0)  # solid yellow = fetch failure / "I don't know"
 
 
-def decide_color(prev: float | None, now: float) -> tuple[int, int, int] | None:
-    """Return the color the lamp should display, or None if no change should be sent.
+def decide_command(prev_price: float | None,
+                   now: float | None,
+                   last_command: Command | None) -> Command | None:
+    """Return the next lamp Command, or None if nothing should be published.
 
-    - prev is None  -> None (first sample, just establish baseline)
-    - now > prev    -> (0, 255, 0)  green
-    - now < prev    -> (255, 0, 0)  red
-    - now == prev   -> None (no publish)
+    - `now is None` (fetch failed) -> solid yellow (deduped if already yellow)
+    - `prev_price is None`         -> None (baseline, first successful sample)
+    - `now > prev_price`           -> animate green (deduped if already)
+    - `now < prev_price`           -> animate red   (deduped if already)
+    - `now == prev_price`, last was animate -> solid in that color (calm down)
+    - `now == prev_price`, last was solid or None -> None
     """
-    if prev is None or now == prev:
+    if now is None:
+        desired: Command = ("solid", YELLOW)
+        return None if desired == last_command else desired
+    if prev_price is None:
         return None
-    return (0, 255, 0) if now > prev else (255, 0, 0)
+    if now > prev_price:
+        desired = ("animate", GREEN)
+    elif now < prev_price:
+        desired = ("animate", RED)
+    elif last_command is not None and last_command[0] == "animate":
+        desired = ("solid", last_command[1])
+    else:
+        return None
+    return None if desired == last_command else desired
 
 
 def fetch_price(symbol: str) -> float | None:
