@@ -102,9 +102,20 @@ default 30. Ctrl-C to stop.
 First sample establishes the baseline (no color change). After that, each
 poll is compared to the previous poll:
 
-- price went up → lamp turns **green**
-- price went down → lamp turns **red**
-- price unchanged → no command sent
+- price went up → lamp **pulses green** (breath animation)
+- price went down → lamp **pulses red** (breath animation)
+- price unchanged → on the *first* flat poll after a tick, the lamp calms
+  down to a **solid color** (whichever direction it was last pulsing);
+  subsequent flat polls publish nothing
+- repeated same-direction ticks are deduplicated, so the pulse doesn't
+  visibly restart on each one
+- fetch failed → lamp goes **solid yellow** ("I don't know"); when the next
+  poll succeeds, the lamp recovers automatically based on the price change
+  since the last successful poll
+
+In short: pulse means "something is moving"; solid green/red means "calm";
+yellow means "I can't see the price right now"; the color tells you the
+most recent direction (or the failure state).
 
 ## Protocol notes
 
