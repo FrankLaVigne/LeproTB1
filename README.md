@@ -29,8 +29,7 @@ cp config.json.example config.json   # then edit with your Lepro account
 ```
 
 `config.json` (git-ignored) or the `LEPRO_ACCOUNT` / `LEPRO_PASSWORD` /
-`LEPRO_REGION` environment variables provide credentials. Regions: `us`, `eu`,
-`na`, `fe`.
+`LEPRO_REGION` environment variables provide credentials. Regions: `na`, `eu`, `fe`.
 
 ## CLI
 

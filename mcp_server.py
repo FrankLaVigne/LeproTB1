@@ -99,6 +99,7 @@ def _guard(fn):
 
 
 @mcp.tool()
+@_guard
 async def list_lights() -> dict:
     """List the lights on the account."""
     return {"ok": True, "lights": [
@@ -106,6 +107,7 @@ async def list_lights() -> dict:
 
 
 @mcp.tool()
+@_guard
 async def list_effects() -> dict:
     """List the built-in effect names and the speed range."""
     return {"ok": True, "effects": EFFECTS, "speed_range": [0, 100]}

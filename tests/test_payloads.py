@@ -113,6 +113,6 @@ def test_build_d50_clamps_rgb_components():
 
 
 def test_build_d50_more_than_9_groups_raises():
-    colors = [(i, 0, 0) for i in range(11)] + [(0, 0, 0)] * 14  # 11 distinct groups
+    colors = [(i, 0, 0) for i in range(11)] + [(0, 0, 0)] * 14  # 12 distinct groups (the trailing (0,0,0) block is a new group)
     with pytest.raises(ValueError):
         lepro._build_d50(colors, "solid")

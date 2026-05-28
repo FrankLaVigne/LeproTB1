@@ -1,4 +1,4 @@
 aiohttp>=3.9
 aiomqtt>=2.0
-mcp>=1.27
+mcp>=1.27,<2
 uvicorn>=0.30
