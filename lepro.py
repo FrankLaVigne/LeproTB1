@@ -30,6 +30,7 @@ import colorsys
 import hashlib
 import json
 import logging
+import math
 import os
 import random
 import ssl
@@ -75,6 +76,26 @@ _B_SERIES_TOKENS = ("B1", "B2", "B3", "BC1", "BP1", "T1", "SE1")
 def _is_b_series(series: str) -> bool:
     s = (series or "").upper()
     return any(tok in s for tok in _B_SERIES_TOKENS)
+
+
+# d50-family effects (firmware runs them); names map to a payload "tail".
+_D50_EFFECTS = ("solid", "breath", "gradient", "clockwise", "counterclockwise", "circular")
+# d60 "special" effects; each maps to a 7-char prefix.
+_D60_SPECIAL = {
+    "flash": "2000064",
+    "wave_1": "2010064", "wave_2": "2020064", "wave_3": "2030064", "wave_4": "2040064",
+    "laser_1": "2050064", "laser_2": "2060064", "laser_3": "2070064", "laser_4": "2080064",
+}
+EFFECTS = list(_D50_EFFECTS) + list(_D60_SPECIAL)
+
+
+def _speed_to_hex(speed: int) -> str:
+    """Encode a 0-100 speed into the 4-hex-char form the d50 effects expect."""
+    s = max(0, min(100, int(speed)))
+    if s <= 0:
+        return "1000"
+    raw = int(round(-117.41 * math.log(s + 1) + 597.75))
+    return f"0{raw:03X}"
 
 
 @dataclass
