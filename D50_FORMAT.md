@@ -119,6 +119,17 @@ parser should build on this.
 | **`W`** | Wide parameter block (`W61000000e102a3` seen once). | Low |
 | **Lowercase `r` / `s` / `c` / `a`** | Not pure hex. Possibly ASCII opcodes for sub-blocks, or base-32/36 encoded values. We genuinely don't know. | Honest "?" |
 
+### New as of `purple-pink-tour` (2026-05-28)
+
+- **`Y`** — a brand new section marker appeared in one frame:
+  `N01:P100028000FFFFC0CBY3646464640001ca001001ca101;`
+  We had never seen `Y` in any of the previous four captures. The payload
+  parses as a normal `N01:` + 2-color palette + `Y...` tail with no other
+  recognizable tokens. The `64646464` portion is suspicious — `0x64 = 100`
+  repeated four times, possibly indicating an "all maxed" parameter set, and
+  `01ca` appears twice (possibly speed or phase). Specific animation unknown.
+  Worth capturing again to confirm reproducibility.
+
 ---
 
 ## What we already know works on the TB1
