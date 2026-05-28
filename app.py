@@ -51,7 +51,7 @@ PAGE = """<!doctype html>
   <label>Brightness <span id="bval">—</span></label>
   <input type="range" id="bright" min="1" max="100" value="100"
          oninput="bval.textContent=this.value+'%'" onchange="setBright(this.value)">
-  <label>Colour</label>
+  <label>Color</label>
   <input type="color" id="color" value="#ffffff" onchange="setColor(this.value)">
   <label>White temperature</label>
   <input type="range" id="cct" min="2700" max="6500" step="100" value="4000"

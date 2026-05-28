@@ -17,10 +17,10 @@ Field semantics (the "d" dict):
   d1  power (0/1)
   d2  mode  (0=white/CCT, 1=RGB, 2=segmented/effect, 3=special effect)
   d3  brightness 0..1000 (white & B-series RGB modes)
-  d4  colour temperature 0..1000 (0=2700K warm, 1000=6500K cool)
+  d4  color temperature 0..1000 (0=2700K warm, 1000=6500K cool)
   d5  RGB as HSV hex: HHHH SSSS VVVV (hue 0..360, sat/val 0..1000)
   d52 brightness 0..1000 (segmented/strip mode)
-  d50 segmented colour+effect string
+  d50 segmented color+effect string
 """
 
 from __future__ import annotations
@@ -379,7 +379,7 @@ class LeproClient:
 
     async def set_color(self, r: int, g: int, b: int, pct: int | None = None,
                         did: str | None = None) -> None:
-        """Set an RGB colour (0..255 each), optional brightness percent."""
+        """Set an RGB color (0..255 each), optional brightness percent."""
         dev = self._dev(did)
         if dev.is_b_series:
             hue, _s, _v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
@@ -388,7 +388,7 @@ class LeproClient:
             d5 = f"{hue_deg:04X}{1000:04X}{val:04X}"  # HHHH SSSS(=03E8) VVVV
             await self._publish(dev.did, {"d1": 1, "d2": 1, "d5": d5})
         else:
-            # Segmented: single solid colour across all 25 segments.
+            # Segmented: single solid color across all 25 segments.
             color = f"{r:02X}{g:02X}{b:02X}"
             d50 = f"N01:P10001{color}F210001{25:04X}U3V3000640000E1;"
             d = {"d1": 1, "d2": 2, "d50": d50}

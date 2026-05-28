@@ -54,7 +54,7 @@ Add `--did <id>` to target a specific light (default: the first one discovered).
 ```
 
 Open `http://<your-vm-ip>:8080`. It holds one persistent login + MQTT connection
-and gives you device selection, on/off, a brightness slider, a colour picker,
+and gives you device selection, on/off, a brightness slider, a color picker,
 and a white-temperature slider. Override the bind address with `LEPRO_HOST` /
 `LEPRO_PORT`.
 
@@ -71,10 +71,10 @@ The `d` dictionary fields:
 | `d1`  | power (0/1) |
 | `d2`  | mode: 0 = white/CCT, 1 = RGB, 2 = segmented/effect, 3 = special effect |
 | `d3`  | brightness 0–1000 (white & B-series RGB modes) |
-| `d4`  | colour temperature 0–1000 (0 = 2700 K warm, 1000 = 6500 K cool) |
+| `d4`  | color temperature 0–1000 (0 = 2700 K warm, 1000 = 6500 K cool) |
 | `d5`  | RGB as HSV hex `HHHHSSSSVVVV` (hue 0–360, sat/val 0–1000) |
 | `d52` | brightness 0–1000 (segmented/strip mode) |
-| `d50` | segmented colour + effect string |
+| `d50` | segmented color + effect string |
 | `d60` | special-effect + sensitivity string |
 
 The **TB1** matches the `B1` model token, so this client treats it as a
