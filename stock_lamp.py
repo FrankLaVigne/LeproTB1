@@ -75,28 +75,44 @@ def _ts() -> str:
 
 
 async def run(symbol: str, interval: float, client, fetch_fn=fetch_price) -> None:
-    """Poll `symbol` every `interval` seconds; color the lamp on each tick."""
+    """Poll `symbol` every `interval` seconds; drive the lamp via decide_command."""
     prev: float | None = None
+    last_command: Command | None = None
     while True:
         now = await asyncio.to_thread(fetch_fn, symbol)
-        if now is None:
-            print(f"{_ts()}  {symbol}  warn: fetch failed")
-        else:
-            color = decide_color(prev, now)
-            if prev is None:
-                print(f"{_ts()}  {symbol}  ${now:.2f}  (first sample, baseline set)")
-            elif color is None:
-                print(f"{_ts()}  {symbol}  ${now:.2f}  · (no change)")
-            elif color == (0, 255, 0):
-                print(f"{_ts()}  {symbol}  ${now:.2f}  ↑ GREEN")
-            else:
-                print(f"{_ts()}  {symbol}  ${now:.2f}  ↓ RED")
+        cmd = decide_command(prev, now, last_command)
 
-            if color is not None:
-                try:
-                    await client.set_color(*color)
-                except Exception as e:  # noqa: BLE001  — log and retry next tick
-                    print(f"warn: lamp publish failed: {e}")
+        # Status line: keep it simple here; Task 5 extracts/refines this.
+        if now is None:
+            suffix = "warn: fetch failed" + (
+                " (lamp → yellow)" if cmd is not None else " (already yellow)"
+            )
+        elif prev is None:
+            suffix = f"${now:.2f}  (first sample, baseline set)"
+        elif cmd is not None:
+            kind, color = cmd
+            verb = "pulsing" if kind == "animate" else "holding"
+            name = "green" if color == GREEN else ("red" if color == RED else "yellow")
+            arrow = "↑" if color == GREEN else ("↓" if color == RED else "·")
+            suffix = f"${now:.2f}  {arrow} {verb} {name}"
+        elif now == prev:
+            suffix = f"${now:.2f}  · (no change)"
+        else:
+            # Same-direction tick deduped.
+            arrow = "↑" if now > prev else "↓"
+            assert last_command is not None
+            name = "green" if last_command[1] == GREEN else "red"
+            suffix = f"${now:.2f}  {arrow} (already pulsing {name})"
+        print(f"{_ts()}  {symbol}  {suffix}")
+
+        if cmd is not None:
+            try:
+                await apply_command(client, cmd)
+                last_command = cmd
+            except Exception as e:  # noqa: BLE001  — log and retry next tick
+                print(f"warn: lamp publish failed: {e}")
+
+        if now is not None:
             prev = now
         await asyncio.sleep(interval)
 

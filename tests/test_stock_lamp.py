@@ -88,13 +88,19 @@ def test_decide_command_recovery_flat_after_yellow_stays_silent():
 
 
 class _FakeClient:
-    """LeproClient stand-in that records set_color calls."""
+    """LeproClient stand-in that records both set_color and set_effect calls."""
 
     def __init__(self):
-        self.calls: list[tuple[int, int, int]] = []
+        # Each entry is ("solid", (r, g, b)) or ("animate", (r, g, b)).
+        self.calls: list[tuple[str, tuple[int, int, int]]] = []
 
     async def set_color(self, r: int, g: int, b: int, pct=None, did=None):
-        self.calls.append((r, g, b))
+        self.calls.append(("solid", (r, g, b)))
+
+    async def set_effect(self, name: str, speed: int = 50,
+                         color: tuple[int, int, int] = (255, 255, 255),
+                         pct=None, did=None):
+        self.calls.append(("animate", color))
 
 
 @pytest.mark.asyncio
@@ -114,29 +120,37 @@ async def test_run_publishes_green_on_uptick_red_on_downtick():
     except asyncio.CancelledError:
         pass
 
-    # First sample → no call. Up → green. Flat → no call. Down → red. Flat → no call.
-    assert client.calls == [(0, 255, 0), (255, 0, 0)]
+    # Baseline 100, up→animate G, flat→solid G, down→animate R, flat→solid R.
+    # After that prices stay at 99.0 → no further calls.
+    G = (0, 255, 0)
+    R = (255, 0, 0)
+    assert client.calls == [("animate", G), ("solid", G), ("animate", R), ("solid", R)]
 
 
 @pytest.mark.asyncio
-async def test_run_tolerates_fetch_failure_and_continues():
-    # First call fails (None), second call succeeds and becomes baseline, third is uptick.
-    seq = chain([None, 100.0, 100.5], repeat(100.5))
+async def test_run_publishes_yellow_then_recovers():
+    # First call fails -> yellow. Second call 100 -> baseline (last_command stays yellow).
+    # Third call 100.5 -> animate green. Subsequent flat 100.5 -> solid green.
+    seq = chain([None, 100.0, 100.5, 100.5, 100.5], repeat(100.5))
 
     def fake_fetch(_):
         return next(seq)
 
     client = _FakeClient()
     task = asyncio.create_task(stock_lamp.run("X", 0.02, client, fake_fetch))
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(0.5)
     task.cancel()
     try:
         await task
     except asyncio.CancelledError:
         pass
 
-    # Failed first call → skipped. Baseline 100. Uptick to 100.5 → green. Flat → no call.
-    assert client.calls == [(0, 255, 0)]
+    G = (0, 255, 0)
+    Y = (255, 255, 0)
+    # First call -> yellow. Baseline poll (100.0) does NOT publish (prev was None,
+    # we still update prev to 100.0 — see run logic). Uptick to 100.5 -> animate G.
+    # Then flat -> solid G. Stop here; further flats publish nothing.
+    assert client.calls[:3] == [("solid", Y), ("animate", G), ("solid", G)]
 
 
 def test_interval_accepts_floor():
