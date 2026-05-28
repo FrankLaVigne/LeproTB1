@@ -84,6 +84,28 @@ confirm what the TB1 actually uses, run `cli.py capture`, trigger each effect in
 the app, and adjust the catalog to the logged `d50`/`d60` values. Segment groups
 are currently capped at 9 until the d50 count-field width is verified this way.
 
+## Stock tracker
+
+Color the lamp green on every uptick and red on every downtick of a single
+stock, polled live:
+
+```bash
+.venv/bin/python stock_lamp.py IBM
+.venv/bin/python stock_lamp.py 7203.T --interval 10   # Toyota on Tokyo
+.venv/bin/python stock_lamp.py BBVA.MC --interval 60  # BBVA on Madrid
+```
+
+The ticker uses Yahoo Finance's suffix convention (no suffix = US listings;
+`.T` = Tokyo; `.MC` = Madrid; etc.). `--interval` is in seconds, minimum 5,
+default 30. Ctrl-C to stop.
+
+First sample establishes the baseline (no color change). After that, each
+poll is compared to the previous poll:
+
+- price went up → lamp turns **green**
+- price went down → lamp turns **red**
+- price unchanged → no command sent
+
 ## Protocol notes
 
 Control commands are an MQTT publish to `le/{deviceId}/prp/set` with payload
