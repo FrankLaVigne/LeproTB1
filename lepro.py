@@ -67,6 +67,7 @@ _CERT_DIR = os.path.join(_HERE, "certs")
 # Reuse a cached token for this long before re-running /user/login, which the
 # API throttles aggressively (code -905). Token itself lives longer server-side.
 _SESSION_TTL = 1800
+_MIN_FRAME_MS = 80  # animation frame floor, to avoid hammering MQTT
 
 # Models that use the B-series protocol (d2=1/d5 HSV for RGB, d3/d4 for white).
 # Note: "TB1" matches "B1", so the table lamp is treated as a B-series device.
@@ -147,6 +148,34 @@ def _build_effect_payload(name: str, speed: int = 50, color=(255, 255, 255),
         raise ValueError(f"unknown effect {name!r}; see lepro.EFFECTS")
     if pct is not None:
         d["d52"] = max(0, min(1000, int(round(pct * 10))))
+    return d
+
+
+def _frame_to_payload(frame: dict, b_series: bool) -> dict:
+    """Convert one animation frame to an MQTT 'd' payload. Raises ValueError if invalid."""
+    dur = frame.get("duration_ms")
+    if not isinstance(dur, int) or dur < _MIN_FRAME_MS:
+        raise ValueError(f"frame duration_ms must be an int >= {_MIN_FRAME_MS}")
+    d: dict = {"d1": 1}
+    if "brightness" in frame:
+        val = max(0, min(1000, int(round(frame["brightness"] * 10))))
+        d["d3" if b_series else "d52"] = val
+    if "segments" in frame:
+        d["d2"] = 2
+        d["d50"] = _build_d50(frame["segments"], "solid")
+    elif "color" in frame:
+        r, g, b = (int(max(0, min(255, c))) for c in frame["color"])
+        if b_series:
+            hue, _s, _v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            hue_deg = int(round((hue * 360) % 360))
+            val = d.get("d3", 1000)
+            d["d2"] = 1
+            d["d5"] = f"{hue_deg:04X}{1000:04X}{val:04X}"
+        else:
+            d["d2"] = 2
+            d["d50"] = _build_d50([(r, g, b)] * 25, "solid")
+    if "color" not in frame and "segments" not in frame and "brightness" not in frame:
+        raise ValueError("frame needs at least one of: color, segments, brightness")
     return d
 
 
@@ -503,6 +532,44 @@ class LeproClient:
 
     async def __aexit__(self, *exc) -> None:
         await self.close()
+
+
+class AnimationPlayer:
+    """Plays a choreographed sequence of frames on one device via MQTT."""
+
+    def __init__(self, client: "LeproClient", device: Device):
+        self._client = client
+        self._device = device
+        self._task: asyncio.Task | None = None
+
+    async def play(self, frames: list[dict], repeat: bool | int = False) -> None:
+        if not frames:
+            raise ValueError("frames must be non-empty")
+        if len(frames) > 500:
+            raise ValueError("too many frames (max 500)")
+        payloads = [(_frame_to_payload(f, self._device.is_b_series), f["duration_ms"])
+                    for f in frames]  # validates all frames up front
+        await self.stop()
+        self._task = asyncio.create_task(self._run(payloads, repeat))
+
+    async def _run(self, payloads, repeat) -> None:
+        loops = (1 << 30) if repeat is True else (1 if repeat is False else int(repeat))
+        try:
+            for _ in range(loops):
+                for d, dur in payloads:
+                    await self._client._publish(self._device.did, d)
+                    await asyncio.sleep(dur / 1000)
+        except asyncio.CancelledError:
+            pass
+
+    async def stop(self) -> None:
+        if self._task and not self._task.done():
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+        self._task = None
 
 
 def load_config() -> dict:
