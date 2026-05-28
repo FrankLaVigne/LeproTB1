@@ -67,3 +67,29 @@ async def test_animation_stop_cancels_repeat():
     count_after_stop = len(c._mqtt.published)
     await asyncio.sleep(0.25)
     assert len(c._mqtt.published) == count_after_stop  # no more frames after stop
+
+
+def test_frame_to_payload_segment_frame_duration_floor():
+    with pytest.raises(ValueError):
+        lepro._frame_to_payload({"segments": [[1, 2, 3]], "duration_ms": 10}, b_series=True)
+
+
+def test_frame_to_payload_brightness_frame_duration_floor():
+    with pytest.raises(ValueError):
+        lepro._frame_to_payload({"brightness": 50, "duration_ms": 10}, b_series=True)
+
+
+@pytest.mark.asyncio
+async def test_play_empty_frames_raises():
+    c = _client()
+    player = lepro.AnimationPlayer(c, c.devices[0])
+    with pytest.raises(ValueError):
+        await player.play([])
+
+
+@pytest.mark.asyncio
+async def test_play_too_many_frames_raises():
+    c = _client()
+    player = lepro.AnimationPlayer(c, c.devices[0])
+    with pytest.raises(ValueError):
+        await player.play([{"color": [1, 2, 3], "duration_ms": 100}] * 501)

@@ -95,3 +95,24 @@ async def test_set_segments_publishes_d50():
     await c.set_segments([(255, 0, 0), (0, 0, 255)])
     d = json.loads(c._mqtt.published[-1][1])["d"]
     assert d["d2"] == 2 and d["d50"].startswith("N01:P10002")
+
+
+def test_build_d50_empty_raises():
+    with pytest.raises(ValueError):
+        lepro._build_d50([])
+
+
+def test_build_d50_normalizes_over_25_segments():
+    d50 = lepro._build_d50([(255, 0, 0)] * 30, "solid")  # 1 group, clamped to 25
+    assert d50 == "N01:P10001FF0000F2100010019U3V3000640000E1;"
+
+
+def test_build_d50_clamps_rgb_components():
+    d50 = lepro._build_d50([(300, -5, 0)] * 25, "solid")  # -> FF0000
+    assert d50.startswith("N01:P10001FF0000")
+
+
+def test_build_d50_more_than_9_groups_raises():
+    colors = [(i, 0, 0) for i in range(11)] + [(0, 0, 0)] * 14  # 11 distinct groups
+    with pytest.raises(ValueError):
+        lepro._build_d50(colors, "solid")

@@ -115,11 +115,13 @@ def _build_d50(segment_colors, effect: str = "solid", speed: int = 50) -> str:
     """Build the grouped d50 string from up to 25 RGB segments + an effect."""
     groups: list[list] = []
     for col in segment_colors:
-        col = tuple(int(c) for c in col)
+        col = tuple(max(0, min(255, int(c))) for c in col)
         if groups and groups[-1][0] == col:
             groups[-1][1] += 1
         else:
             groups.append([col, 1])
+    if not groups:
+        raise ValueError("segment_colors must be non-empty")
     total = sum(g[1] for g in groups)
     if total < 25:
         groups[-1][1] += 25 - total
@@ -130,6 +132,12 @@ def _build_d50(segment_colors, effect: str = "solid", speed: int = 50) -> str:
         else:
             groups.pop()
     num = len(groups)
+    if num > 9:
+        raise ValueError(
+            f"{num} distinct segment groups exceeds the verified maximum of 9; "
+            "the d50 count-field width for >9 groups is unconfirmed on the TB1. "
+            "Run 'cli.py capture' to verify, then lift this guard."
+        )
     colors_str = "".join(f"{r:02X}{g:02X}{b:02X}" for (r, g, b), _ in groups)
     lengths_str = "".join(f"{cnt:04X}" for _, cnt in groups)
     tail = _effect_tail(effect, _speed_to_hex(speed))
@@ -553,6 +561,8 @@ class AnimationPlayer:
         self._task = asyncio.create_task(self._run(payloads, repeat))
 
     async def _run(self, payloads, repeat) -> None:
+        # repeat True -> effectively infinite; False -> once; int -> that many loops.
+        # Identity checks (is True/is False) matter because bool is a subclass of int.
         loops = (1 << 30) if repeat is True else (1 if repeat is False else int(repeat))
         try:
             for _ in range(loops):
@@ -561,6 +571,8 @@ class AnimationPlayer:
                     await asyncio.sleep(dur / 1000)
         except asyncio.CancelledError:
             pass
+        except Exception as e:  # noqa: BLE001
+            _LOG.warning("animation stopped on error: %s", e)
 
     async def stop(self) -> None:
         if self._task and not self._task.done():
