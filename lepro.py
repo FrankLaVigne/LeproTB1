@@ -41,11 +41,11 @@ import aiomqtt
 
 _LOG = logging.getLogger("lepro")
 
+# Note: there is no separate "us" host — North American accounts use "na".
 REGIONS = {
     "eu": "api-eu-iot.lepro.com",
     "na": "api-na-iot.lepro.com",
     "fe": "api-fe-iot.lepro.com",
-    "us": "api-us-iot.lepro.com",
 }
 
 # App identity headers — the API rejects requests that don't look like the app.
@@ -63,6 +63,9 @@ _BASE_HEADERS = {
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_KEY = os.path.join(_HERE, "client_key.pem")
 _CERT_DIR = os.path.join(_HERE, "certs")
+# Reuse a cached token for this long before re-running /user/login, which the
+# API throttles aggressively (code -905). Token itself lives longer server-side.
+_SESSION_TTL = 1800
 
 # Models that use the B-series protocol (d2=1/d5 HSV for RGB, d3/d4 for white).
 # Note: "TB1" matches "B1", so the table lamp is treated as a B-series device.
@@ -91,10 +94,14 @@ class LeproError(RuntimeError):
     pass
 
 
+class AuthError(LeproError):
+    """Token rejected / expired — triggers a fresh login."""
+
+
 class LeproClient:
     """Async client for Lepro's cloud. Use as an async context manager."""
 
-    def __init__(self, account: str, password: str, region: str = "us",
+    def __init__(self, account: str, password: str, region: str = "na",
                  language: str = "en", key_path: str = _DEFAULT_KEY):
         if region not in REGIONS:
             raise ValueError(f"region must be one of {list(REGIONS)}")
@@ -134,24 +141,84 @@ class LeproClient:
     async def _get_json(self, path: str) -> dict:
         url = f"https://{self.api_host}{path}"
         async with self._session.get(url, headers=self._headers()) as r:
-            if r.status != 200:
-                raise LeproError(f"GET {path} -> HTTP {r.status}")
-            data = await r.json()
-        if data.get("code") not in (0, None):
-            raise LeproError(f"GET {path} -> code={data.get('code')} msg={data.get('msg')}")
+            status = r.status
+            try:
+                data = await r.json()
+            except Exception:  # noqa: BLE001
+                data = {}
+        code = data.get("code")
+        if status == 401 or code in (401, -901, -902):
+            raise AuthError(f"GET {path} -> token rejected (code={code})")
+        if status != 200 or (code not in (0, None)):
+            raise LeproError(
+                f"GET {path} -> HTTP {status} code={code} msg={data.get('msg')!r}")
         return data
 
+    @property
+    def _session_path(self) -> str:
+        return os.path.join(_CERT_DIR, "session.json")
+
+    @property
+    def _ca_path(self) -> str:
+        return os.path.join(_CERT_DIR, "root_ca.pem")
+
+    @property
+    def _cert_path(self) -> str:
+        return os.path.join(_CERT_DIR, "client_cert.pem")
+
     async def login(self) -> None:
-        """Authenticate and discover account devices + MQTT endpoint."""
+        """Authenticate (reusing a cached token if fresh) and discover devices."""
         self._session = aiohttp.ClientSession()
+        # A resumed session needs no REST calls at all: MQTT control authenticates
+        # with the cached client cert, and the device list is cached too.
+        if self._resume_session():
+            self._build_ssl()
+            return
+        await self._authenticate()
+        self._build_ssl()
+        await self._load_devices()
+        self._save_session()
+
+    def _resume_session(self) -> bool:
+        """Restore token, MQTT info, and devices from cache if recent + certs present."""
+        try:
+            with open(self._session_path) as f:
+                s = json.load(f)
+        except (OSError, ValueError):
+            return False
+        if s.get("account") != self.account or s.get("region") != self.region:
+            return False
+        if time.time() - s.get("ts", 0) > _SESSION_TTL:
+            return False
+        if not (os.path.exists(self._ca_path) and os.path.exists(self._cert_path)):
+            return False
+        self._token = s["token"]
+        self._mqtt_info = s["mqtt"]
+        self.devices = [Device(**d) for d in s.get("devices", [])]
+        if not self.devices:
+            return False
+        _LOG.info("resumed cached session for %s (%d device(s))", self.account, len(self.devices))
+        return True
+
+    def _save_session(self) -> None:
+        os.makedirs(_CERT_DIR, exist_ok=True)
+        with open(self._session_path, "w") as f:
+            json.dump({
+                "account": self.account, "region": self.region,
+                "token": self._token, "mqtt": self._mqtt_info,
+                "ts": int(time.time()),
+                "devices": [
+                    {"did": d.did, "fid": d.fid, "name": d.name, "series": d.series}
+                    for d in self.devices
+                ],
+            }, f)
+
+    async def _authenticate(self) -> None:
+        """Fresh /user/login, fetch profile + MQTT certs, cache the session."""
         payload = {
-            "platform": "2",
-            "account": self.account,
-            "password": self.password,
-            "mac": self._mac,
-            "timestamp": str(int(time.time())),
-            "language": self.language,
-            "fcmToken": "",
+            "platform": "2", "account": self.account, "password": self.password,
+            "mac": self._mac, "timestamp": str(int(time.time())),
+            "language": self.language, "fcmToken": "",
         }
         headers = self._headers()
         headers["Content-Type"] = "application/json"
@@ -171,12 +238,12 @@ class LeproClient:
         self._mqtt_info = profile["data"]["mqtt"]
         await self._download_certs()
 
+    async def _load_devices(self) -> None:
         ts = str(int(time.time()))
         fam = await self._get_json(f"/family/list/timestamp/{ts}")
         families = fam["data"]["list"]
         if not families:
             raise LeproError("no families on this account")
-
         self.devices = []
         for family in families:
             fid = family["fid"]
@@ -191,17 +258,18 @@ class LeproClient:
 
     async def _download_certs(self) -> None:
         os.makedirs(_CERT_DIR, exist_ok=True)
-        ca = os.path.join(_CERT_DIR, "root_ca.pem")
-        cert = os.path.join(_CERT_DIR, "client_cert.pem")
-        for url, path in ((self._mqtt_info["root"], ca), (self._mqtt_info["cert"], cert)):
+        for url, path in ((self._mqtt_info["root"], self._ca_path),
+                          (self._mqtt_info["cert"], self._cert_path)):
             async with self._session.get(url, headers=self._headers()) as r:
                 if r.status != 200:
                     raise LeproError(f"cert download {url} -> HTTP {r.status}")
                 with open(path, "wb") as f:
                     f.write(await r.read())
+
+    def _build_ssl(self) -> None:
         ctx = ssl.create_default_context()
-        ctx.load_verify_locations(cafile=ca)
-        ctx.load_cert_chain(certfile=cert, keyfile=self.key_path)
+        ctx.load_verify_locations(cafile=self._ca_path)
+        ctx.load_cert_chain(certfile=self._cert_path, keyfile=self.key_path)
         self._ssl = ctx
 
     # ----- MQTT --------------------------------------------------------------
@@ -209,6 +277,12 @@ class LeproClient:
     async def connect_mqtt(self) -> aiomqtt.Client:
         if self._mqtt_info is None:
             raise LeproError("call login() before connect_mqtt()")
+        if self._mqtt is not None:  # tear down a previous connection (reconnect)
+            try:
+                await self._mqtt.__aexit__(None, None, None)
+            except Exception:  # noqa: BLE001
+                pass
+            self._mqtt = None
         self._mqtt = aiomqtt.Client(
             hostname=self._mqtt_info["host"],
             port=int(self._mqtt_info["port"]),
@@ -236,21 +310,39 @@ class LeproClient:
         await self._mqtt.publish(f"le/{did}/prp/get", json.dumps({"d": list(keys)}))
 
     async def listen(self, on_update=None) -> None:
-        """Consume MQTT messages, updating self.state. Optional async on_update(did, d)."""
-        async for msg in self._mqtt.messages:
+        """Consume MQTT messages once, updating self.state. Returns on disconnect.
+
+        The broker drops us when the account's connection slot is claimed elsewhere
+        (e.g. the phone app), so a clean disconnect is expected, not an error.
+        """
+        try:
+            async for msg in self._mqtt.messages:
+                try:
+                    parts = msg.topic.value.split("/")
+                    if len(parts) < 4 or parts[0] != "le":
+                        continue
+                    did = parts[1]
+                    body = json.loads(msg.payload.decode())
+                    d = body.get("d", {})
+                    if isinstance(d, dict):
+                        self.state.setdefault(did, {}).update(d)
+                        if on_update:
+                            await on_update(did, d)
+                except Exception as e:  # noqa: BLE001
+                    _LOG.warning("bad MQTT message: %s", e)
+        except aiomqtt.MqttError as e:
+            _LOG.info("MQTT disconnected: %s", e)
+
+    async def listen_forever(self, on_update=None, backoff: float = 3.0) -> None:
+        """Listen with automatic reconnect — for long-lived consumers (the web app)."""
+        while True:
+            await self.listen(on_update=on_update)
+            await asyncio.sleep(backoff)
             try:
-                parts = msg.topic.value.split("/")
-                if len(parts) < 4 or parts[0] != "le":
-                    continue
-                did = parts[1]
-                body = json.loads(msg.payload.decode())
-                d = body.get("d", {})
-                if isinstance(d, dict):
-                    self.state.setdefault(did, {}).update(d)
-                    if on_update:
-                        await on_update(did, d)
+                await self.connect_mqtt()
             except Exception as e:  # noqa: BLE001
-                _LOG.warning("bad MQTT message: %s", e)
+                _LOG.warning("MQTT reconnect failed: %s", e)
+                await asyncio.sleep(backoff)
 
     # ----- high-level commands ----------------------------------------------
 

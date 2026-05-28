@@ -128,8 +128,9 @@ async def _on_startup(app):
     await client.login()
     await client.connect_mqtt()
     app["lepro"] = client
-    # Background listener keeps client.state fresh and drains the MQTT queue.
-    app["listener"] = asyncio.create_task(client.listen())
+    # Background listener keeps client.state fresh and drains the MQTT queue,
+    # auto-reconnecting when the broker drops us (e.g. phone app reclaims the slot).
+    app["listener"] = asyncio.create_task(client.listen_forever())
     logging.info("ready: %d device(s)", len(client.devices))
 
 
