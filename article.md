@@ -217,6 +217,98 @@ Google password. Your Google account is untouched.)
 > config, token caching, session limits, auth flows. Learn them once on a lamp
 > and you'll recognize them everywhere in software.
 
+## The animations were a different story
+
+With power, brightness, color, and white temperature working, I went looking for
+the dynamic stuff — the chasing lights, breathing pulses, color cycles the app's
+effects screen offered. The reference integration I'd been leaning on had a list
+of effect names (`breath`, `clockwise`, `gradient`, `circular`…) and the encodings
+to trigger each one. I wired up `set_effect("clockwise", red)`, ran it, and waited
+for a red dot to chase around the rings.
+
+The lamp went solid red.
+
+I tried `circular` — same thing. `counterclockwise`. `breath`, though, **did**
+pulse correctly. So the lamp obviously *could* run animations; it just wasn't
+running the rotational ones from my code.
+
+That sent me down the most interesting rabbit hole in the project. I needed to
+see what the lamp was *actually receiving* when an effect ran. Since the protocol
+is MQTT, that meant subscribing to the lamp's report topic and triggering an
+effect from the *app* — letting it speak its native language while I eavesdropped.
+
+So I wrote a `capture` mode: log in, subscribe to the lamp's report topic, dump
+anything it emits. Then I opened the Lepro app, typed `"Christmas"` into its
+**AI prompt** (Lepro calls it *LightGPM* — an LLM that designs a custom scene
+from a phrase), and watched.
+
+What came back was nothing like what I'd been sending. Where my code generated
+short payloads like
+`N01:P10001FF0000F2100010019U3V3100640000E1C2O600A2;`, the lamp was reporting
+things like this:
+
+```
+N02:P10006FF8000FFAC59BF6000800000BF6000FFBF00U4T2X5F2000040201040103010501E401c2000001c20064I70384O60a8c;P600U4T2X5F20000204010601E40000000005460064I70546V3030640000O60a8c;
+```
+
+```
+#V:0358c4000000003ec4000000002ec400000000;
+#I00:N02:P10003FF0000008000FF0000U701R301011...;
+#I01:N02:P10003FF0000008000FF0000U701R301011...;
+#I02:N02:P10003FF0000008000FF0000U701R301011...;
+```
+
+A whole format I'd never seen. **Multi-program** payloads with `P1000` and `P600`
+sections strung together. A `#V:` metadata header. `#I00`, `#I01`, `#I02` blocks
+— almost certainly **per-ring** programs, since the TB1 has three concentric
+rings (88 + 62 + 46 LEDs). Lowercase fields (`c2`, `r0`, `a8c`) that weren't
+even pure hex.
+
+The reference integration I'd been standing on had reverse-engineered the
+*strip-light* protocol. The TB1 is a much richer device — addressable rings,
+AI-generated scenes — and its real animation language is something the
+open-source community simply hasn't mapped yet. I could spend weeks decoding
+that format on my own, or…
+
+I could just **replay it**.
+
+## The leverage point
+
+Here's the move that made the project click. I can't *generate* those payloads,
+but I can *capture* and *replay* them — verbatim. The lamp doesn't care that the
+d50 string came from the AI vs. from my script; it just runs whatever it's
+handed. So the workflow flipped:
+
+1. Open the Lepro app.
+2. Type a prompt into the AI: `"mars colors"`, `"Christmas"`, `"campfire"`,
+   `"aurora borealis"`.
+3. While the AI's effect plays, my `capture` script logs everything the lamp
+   emits.
+4. Save the captured payloads as a JSON preset.
+5. **Replay forever, from code or from an AI agent, no app required.**
+
+The proprietary feature I was supposedly locked out of — the one that costs
+Lepro the most to design and maintain, the LLM-driven lighting designer —
+quietly became my preset generator. Type a phrase once, capture the result, and
+now I have a permanent, scriptable effect I can trigger from anything that
+speaks MQTT. The lock-in inverted.
+
+Now my `presets/` directory looks like this:
+
+```
+presets/
+├── mars_colors.json   # a pulsing red/orange breath
+└── christmas.json     # 15-frame red-and-green sequence
+```
+
+`python play_preset.py christmas` reproduces the AI-designed Christmas
+animation perfectly. And every prompt I think of adds another permanent entry
+to the library.
+
+This is the lesson I didn't see coming when I started: **sometimes the win
+isn't reverse-engineering everything — it's finding the place where the system
+will hand you what you need if you just hold out a bucket.**
+
 ## Should you do this? A word on ethics and expectations
 
 A few honest caveats before you go forth:
@@ -242,13 +334,21 @@ worth remembering:
 2. **Check for Tuya first.** A 20-second scan can save you days.
 3. **MQTT is everywhere.** Learn its publish/subscribe model and IoT stops being
    mysterious.
-4. **Read other people's work.** The community has probably solved your problem.
+4. **Read other people's work.** The community has probably solved your
+   problem — but they may have only solved *part* of it. The frontier of any
+   device's protocol is usually wider than the open-source coverage.
 5. **The errors teach the most.** Rate limits, session conflicts, and lying docs
    are features of the territory, not personal failures.
+6. **Look for leverage points.** When reverse-engineering hits a wall, ask
+   whether the system itself can be coaxed into generating what you need — then
+   capture it. Sometimes the proprietary feature you can't reproduce is the
+   exact thing that wants to be your preset generator.
 
-My lamp now answers to a web page I wrote and a one-line command in my terminal.
-It's a small thing. But understanding the machine well enough to bend it to your
-will — that's the whole reason a lot of us got into this in the first place.
+My lamp now answers to a web page I wrote, a one-line command in my terminal,
+and a growing library of AI-designed scenes I captured once and own forever.
+It's a small thing. But understanding the machine well enough to bend it to
+your will — and knowing when to let the machine do the bending for you —
+that's the whole reason a lot of us got into this in the first place.
 
 Now go find out what *your* gadgets are really saying.
 
