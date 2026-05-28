@@ -12,6 +12,14 @@ import yfinance as yf
 
 from lepro import LeproClient, load_config
 
+# --- types & constants ---------------------------------------------------------
+
+Command = tuple[str, tuple[int, int, int]]  # ("animate" | "solid", (r, g, b))
+
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+YELLOW = (255, 255, 0)  # solid yellow = fetch failure / "I don't know"
+
 
 def decide_color(prev: float | None, now: float) -> tuple[int, int, int] | None:
     """Return the color the lamp should display, or None if no change should be sent.
