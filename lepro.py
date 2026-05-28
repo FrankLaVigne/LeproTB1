@@ -594,5 +594,8 @@ def load_config() -> dict:
     return {
         "account": os.environ.get("LEPRO_ACCOUNT", cfg.get("account")),
         "password": os.environ.get("LEPRO_PASSWORD", cfg.get("password")),
-        "region": os.environ.get("LEPRO_REGION", cfg.get("region", "us")),
+        "region": os.environ.get("LEPRO_REGION", cfg.get("region", "na")),
+        "mcp_token": os.environ.get("LEPRO_MCP_TOKEN", cfg.get("mcp_token")),
+        "mcp_host": os.environ.get("LEPRO_MCP_HOST", cfg.get("mcp_host", "0.0.0.0")),
+        "mcp_port": int(os.environ.get("LEPRO_MCP_PORT", cfg.get("mcp_port", 8765))),
     }
