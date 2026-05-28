@@ -1,0 +1,7 @@
+# Local secrets & runtime artifacts — never commit these
+config.json
+certs/
+.venv/
+__pycache__/
+*.pyc
+snapshot.json
