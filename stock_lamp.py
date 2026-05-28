@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import yfinance as yf
+
 
 def decide_color(prev: float | None, now: float) -> tuple[int, int, int] | None:
     """Return the color the lamp should display, or None if no change should be sent.
@@ -15,3 +17,15 @@ def decide_color(prev: float | None, now: float) -> tuple[int, int, int] | None:
     if prev is None or now == prev:
         return None
     return (0, 255, 0) if now > prev else (255, 0, 0)
+
+
+def fetch_price(symbol: str) -> float | None:
+    """Return the latest known price for `symbol`, or None on any error.
+
+    Synchronous; the async loop wraps this in `asyncio.to_thread`.
+    """
+    try:
+        price = yf.Ticker(symbol).fast_info["last_price"]
+        return float(price) if price is not None else None
+    except Exception:  # noqa: BLE001  — any yfinance / network error -> None
+        return None
