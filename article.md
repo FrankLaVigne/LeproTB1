@@ -298,12 +298,15 @@ Now my `presets/` directory looks like this:
 ```
 presets/
 ├── mars_colors.json   # a pulsing red/orange breath
-└── christmas.json     # 15-frame red-and-green sequence
+├── christmas.json     # 15-frame red-and-green sequence
+├── cyberpunk.json     # 25-frame neon spectrum
+└── hulk.json          # 26-frame green/lime/brown rage cycle
 ```
 
-`python play_preset.py christmas` reproduces the AI-designed Christmas
+`python play_preset.py cyberpunk` reproduces the AI-designed cyberpunk
 animation perfectly. And every prompt I think of adds another permanent entry
-to the library.
+to the library — each one takes about a minute to capture and lives in the
+repo as a small JSON file that anyone can replay.
 
 This is the lesson I didn't see coming when I started: **sometimes the win
 isn't reverse-engineering everything — it's finding the place where the system
@@ -354,5 +357,20 @@ Now go find out what *your* gadgets are really saying.
 
 ---
 
-*The complete, documented project — Python client, CLI, and web UI — is
-available on GitHub. Pull requests welcome.*
+## Use this as a reference
+
+I want this project to be useful to other people working on their own
+cloud-IoT devices. So alongside the code, I've written the full methodology
+as a separate playbook — **[REVERSE_ENGINEERING.md](REVERSE_ENGINEERING.md)** in
+the repo — covering the seven phases I walked through (identify, document,
+find the connection, build a minimal client, capture, decide between decode
+and replay, package). It's written to apply to any cloud-connected smart
+device, not just the Lepro TB1; the TB1 is the worked example throughout.
+
+If you've used the playbook on a different device, found something new about
+the TB1's `d50` format, or just have notes from your own reverse-engineering
+adventure — **please open an issue or a pull request**. The community is how
+any of us learns this stuff. Pay it forward.
+
+*The complete, documented project — Python client, CLI, web UI, MCP server,
+preset library, and methodology playbook — is available on GitHub.*
