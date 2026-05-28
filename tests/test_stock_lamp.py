@@ -169,3 +169,30 @@ def test_interval_rejects_below_floor():
 def test_interval_rejects_non_integer():
     with pytest.raises(argparse.ArgumentTypeError):
         stock_lamp._interval("nope")
+
+
+# --- _status_line tests --------------------------------------------------------
+
+
+def test_status_line_baseline():
+    assert stock_lamp._status_line(None, 100.0, None, None) == "$100.00  (first sample, baseline set)"
+
+
+def test_status_line_uptick_publishing():
+    assert stock_lamp._status_line(100.0, 100.5, ANIMATE_G, None) == "$100.50  ↑ pulsing green"
+
+
+def test_status_line_uptick_deduped():
+    assert stock_lamp._status_line(100.0, 100.5, None, ANIMATE_G) == "$100.50  ↑ (already pulsing green)"
+
+
+def test_status_line_flat_no_change():
+    assert stock_lamp._status_line(100.0, 100.0, None, SOLID_G) == "$100.00  · (no change)"
+
+
+def test_status_line_fetch_failure_publishing_yellow():
+    assert stock_lamp._status_line(100.0, None, SOLID_Y, ANIMATE_G) == "warn: fetch failed (lamp → yellow)"
+
+
+def test_status_line_fetch_failure_already_yellow():
+    assert stock_lamp._status_line(100.0, None, None, SOLID_Y) == "warn: fetch failed (already yellow)"

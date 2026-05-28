@@ -58,6 +58,31 @@ async def apply_command(client, cmd: Command) -> None:
         await client.set_color(*color)
 
 
+def _status_line(prev: float | None,
+                 now: float | None,
+                 cmd: Command | None,
+                 last_command: Command | None) -> str:
+    """Render the human-readable suffix shown after the timestamp + symbol."""
+    if now is None:
+        return "warn: fetch failed" + (
+            " (lamp → yellow)" if cmd is not None else " (already yellow)"
+        )
+    if prev is None:
+        return f"${now:.2f}  (first sample, baseline set)"
+    if cmd is not None:
+        kind, color = cmd
+        verb = "pulsing" if kind == "animate" else "holding"
+        name = "green" if color == GREEN else ("red" if color == RED else "yellow")
+        arrow = "↑" if color == GREEN else ("↓" if color == RED else "·")
+        return f"${now:.2f}  {arrow} {verb} {name}"
+    if now == prev:
+        return f"${now:.2f}  · (no change)"
+    # Same-direction tick deduped.
+    arrow = "↑" if now > prev else "↓"
+    name = "green" if last_command is not None and last_command[1] == GREEN else "red"
+    return f"${now:.2f}  {arrow} (already pulsing {name})"
+
+
 def fetch_price(symbol: str) -> float | None:
     """Return the latest known price for `symbol`, or None on any error.
 
@@ -82,27 +107,7 @@ async def run(symbol: str, interval: float, client, fetch_fn=fetch_price) -> Non
         now = await asyncio.to_thread(fetch_fn, symbol)
         cmd = decide_command(prev, now, last_command)
 
-        # Status line: keep it simple here; Task 5 extracts/refines this.
-        if now is None:
-            suffix = "warn: fetch failed" + (
-                " (lamp → yellow)" if cmd is not None else " (already yellow)"
-            )
-        elif prev is None:
-            suffix = f"${now:.2f}  (first sample, baseline set)"
-        elif cmd is not None:
-            kind, color = cmd
-            verb = "pulsing" if kind == "animate" else "holding"
-            name = "green" if color == GREEN else ("red" if color == RED else "yellow")
-            arrow = "↑" if color == GREEN else ("↓" if color == RED else "·")
-            suffix = f"${now:.2f}  {arrow} {verb} {name}"
-        elif now == prev:
-            suffix = f"${now:.2f}  · (no change)"
-        else:
-            # Same-direction tick deduped.
-            arrow = "↑" if now > prev else "↓"
-            assert last_command is not None
-            name = "green" if last_command[1] == GREEN else "red"
-            suffix = f"${now:.2f}  {arrow} (already pulsing {name})"
+        suffix = _status_line(prev, now, cmd, last_command)
         print(f"{_ts()}  {symbol}  {suffix}")
 
         if cmd is not None:
