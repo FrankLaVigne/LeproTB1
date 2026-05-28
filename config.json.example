@@ -1,5 +1,8 @@
 {
   "account": "you@example.com",
   "password": "your-lepro-password",
-  "region": "us"
+  "region": "na",
+  "mcp_token": "change-me-to-a-long-random-string",
+  "mcp_host": "0.0.0.0",
+  "mcp_port": 8765
 }

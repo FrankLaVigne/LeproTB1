@@ -58,6 +58,33 @@ and gives you device selection, on/off, a brightness slider, a color picker,
 and a white-temperature slider. Override the bind address with `LEPRO_HOST` /
 `LEPRO_PORT`.
 
+## MCP server
+
+Expose the lamp to AI agents (OpenClaw, Claude Desktop/Code, any MCP client) over
+the network:
+
+```bash
+# add "mcp_token": "<random>" to config.json, then:
+.venv/bin/python mcp_server.py        # streamable-HTTP on 0.0.0.0:8765
+```
+
+Clients connect to `http://<vm-ip>:8765/mcp` with header
+`Authorization: Bearer <mcp_token>`. Tools: `list_lights`, `list_effects`,
+`set_power`, `set_brightness`, `set_color`, `set_white`, `set_effect`,
+`set_segments`, `play_animation`, `stop_animation`, `get_state`, `send_raw`.
+
+Override bind with `LEPRO_MCP_HOST` / `LEPRO_MCP_PORT`. Without a token the server
+refuses to bind a non-loopback address.
+
+**Recommended:** run the server under a *dedicated second Lepro account* shared
+into the lamp's Home, so it doesn't fight your phone for the single session.
+
+### Effects on the TB1
+Effect/segment payloads were reverse-engineered from Lepro bulbs/strips. To
+confirm what the TB1 actually uses, run `cli.py capture`, trigger each effect in
+the app, and adjust the catalog to the logged `d50`/`d60` values. Segment groups
+are currently capped at 9 until the d50 count-field width is verified this way.
+
 ## Protocol notes
 
 Control commands are an MQTT publish to `le/{deviceId}/prp/set` with payload

@@ -37,6 +37,8 @@ async def main() -> int:
     sp_w = sub.add_parser("white")
     sp_w.add_argument("kelvin", type=int); sp_w.add_argument("pct", type=int, nargs="?", default=None)
     sp_r = sub.add_parser("raw"); sp_r.add_argument("json")
+    sp_cap = sub.add_parser("capture", help="log raw MQTT reports while you trigger effects in the app")
+    sp_cap.add_argument("--seconds", type=int, default=120)
     args = p.parse_args()
 
     cfg = load_config()
@@ -64,6 +66,22 @@ async def main() -> int:
                 pass
             did = (args.did or (client.devices[0].did if client.devices else None))
             print(json.dumps(client.state.get(str(did), {}), indent=2))
+            return 0
+
+        if args.cmd == "capture":
+            did = args.did or client.devices[0].did
+            await client.request_state(did)
+            print(f"Listening {args.seconds}s on le/{did}/prp/# — trigger effects in the app now…")
+
+            async def on_update(d, fields):
+                interesting = {k: fields[k] for k in ("d2", "d50", "d60", "d5") if k in fields}
+                if interesting:
+                    print(f"[{d}] {interesting}")
+
+            try:
+                await asyncio.wait_for(client.listen(on_update=on_update), timeout=args.seconds)
+            except asyncio.TimeoutError:
+                pass
             return 0
 
         if args.cmd == "on":
