@@ -10,6 +10,8 @@ from datetime import datetime
 
 import yfinance as yf
 
+from lepro import LeproClient, load_config
+
 
 def decide_color(prev: float | None, now: float) -> tuple[int, int, int] | None:
     """Return the color the lamp should display, or None if no change should be sent.
@@ -65,9 +67,6 @@ async def run(symbol: str, interval: float, client, fetch_fn=fetch_price) -> Non
                     print(f"warn: lamp publish failed: {e}")
             prev = now
         await asyncio.sleep(interval)
-
-
-from lepro import LeproClient, load_config
 
 
 def _interval(value: str) -> int:

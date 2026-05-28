@@ -1,5 +1,9 @@
 """Tests for stock_lamp."""
 
+import argparse
+import asyncio
+from itertools import chain, repeat
+
 import pytest
 
 import stock_lamp
@@ -19,10 +23,6 @@ def test_decide_color_downtick_returns_red():
 
 def test_decide_color_flat_returns_none():
     assert stock_lamp.decide_color(100.0, 100.0) is None
-
-
-import asyncio
-from itertools import chain, repeat
 
 
 class _FakeClient:
@@ -75,9 +75,6 @@ async def test_run_tolerates_fetch_failure_and_continues():
 
     # Failed first call → skipped. Baseline 100. Uptick to 100.5 → green. Flat → no call.
     assert client.calls == [(0, 255, 0)]
-
-
-import argparse
 
 
 def test_interval_accepts_floor():
