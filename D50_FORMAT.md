@@ -51,7 +51,7 @@ same surface — think one "color/palette/structure" layer and a second
 
 ---
 
-## The palette block (high confidence)
+## The palette block (experimentally confirmed)
 
 ```
 P1000{N}{R1G1B1}{R2G2B2}...{RNGNBN}
@@ -63,6 +63,26 @@ P1000{N}{R1G1B1}{R2G2B2}...{RNGNBN}
 - An alternate parse — `P1` + `00` + `06` (count) — produces the same colors;
   use whichever mental model you prefer. The reference Home Assistant
   integration uses the `P1000` form, so the codebase here follows that.
+
+### Experimental confirmation (2026-05-28)
+
+`presets/white-blue-tour.json` was generated from `presets/purple-pink-tour.json`
+by a mechanical hex-string substitution applied **only to the palette colors**
+inside each frame's `d50` string (`8000FF` → `FFFFFF`, `FFC0CB` → `0000FF`).
+Motion fields (`U`/`T`/`X`/`S`/`O`/`R`/etc.) were left untouched.
+
+When replayed on the actual TB1, the result was **the same sequence of
+animations with the colors swapped to white + blue.** No animations broke; no
+purple or pink survived. This is direct experimental evidence that:
+
+1. Palette colors live exclusively inside the `P1000{N}{colors}` block.
+2. Motion fields reference colors by **palette index** rather than hex RGB.
+3. Captured presets can be mechanically recolored without parsing any of the
+   still-mysterious motion fields.
+
+This is the cleanest single experiment in the project so far. A future
+`recolor_preset.py` helper or CLI subcommand becomes a trivial 20-line
+implementation now that the boundary is proven.
 
 ### Other `P`-prefixes
 
