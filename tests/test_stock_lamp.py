@@ -150,7 +150,7 @@ async def test_run_publishes_yellow_then_recovers():
     # First call -> yellow. Baseline poll (100.0) does NOT publish (prev was None,
     # we still update prev to 100.0 — see run logic). Uptick to 100.5 -> animate G.
     # Then flat -> solid G. Stop here; further flats publish nothing.
-    assert client.calls[:3] == [("solid", Y), ("animate", G), ("solid", G)]
+    assert client.calls == [("solid", Y), ("animate", G), ("solid", G)]
 
 
 def test_interval_accepts_floor():
@@ -196,3 +196,11 @@ def test_status_line_fetch_failure_publishing_yellow():
 
 def test_status_line_fetch_failure_already_yellow():
     assert stock_lamp._status_line(100.0, None, None, SOLID_Y) == "warn: fetch failed (already yellow)"
+
+
+def test_status_line_solid_green_calmdown():
+    assert stock_lamp._status_line(100.0, 100.0, SOLID_G, ANIMATE_G) == "$100.00  · holding green"
+
+
+def test_status_line_solid_red_calmdown():
+    assert stock_lamp._status_line(100.0, 100.0, SOLID_R, ANIMATE_R) == "$100.00  · holding red"

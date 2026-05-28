@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Track a stock ticker and color the lamp green on uptick / red on downtick."""
+"""Track a stock ticker: pulse green/red on ticks, calm to solid on flat, yellow on fetch failure."""
 
 from __future__ import annotations
 
@@ -73,7 +73,10 @@ def _status_line(prev: float | None,
         kind, color = cmd
         verb = "pulsing" if kind == "animate" else "holding"
         name = "green" if color == GREEN else ("red" if color == RED else "yellow")
-        arrow = "↑" if color == GREEN else ("↓" if color == RED else "·")
+        if kind == "solid":
+            arrow = "·"
+        else:
+            arrow = "↑" if color == GREEN else "↓"
         return f"${now:.2f}  {arrow} {verb} {name}"
     if now == prev:
         return f"${now:.2f}  · (no change)"
@@ -156,7 +159,7 @@ async def _run_main(symbol: str, interval: int) -> int:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Color the lamp green on uptick / red on downtick.")
+    p = argparse.ArgumentParser(description="Pulse the lamp green on uptick, red on downtick, solid on flat, yellow on fetch failure.")
     p.add_argument("symbol", help="Yahoo ticker, e.g. IBM, 7203.T, BBVA.MC")
     p.add_argument("--interval", type=_interval, default=30,
                    help="seconds between polls (minimum 5; default 30)")
