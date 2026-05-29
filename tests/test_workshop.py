@@ -279,3 +279,70 @@ def test_effect_tail_speed_clamps_above_100():
 def test_effect_tail_unknown_effect_raises():
     with pytest.raises(ValueError):
         workshop.effect_tail("WiggleJiggle", 50)
+
+
+# --- build_d50_from_leds tests ------------------------------------------------
+
+
+def _all(n, color):
+    return [color] * n
+
+
+def test_build_d50_from_leds_all_white_steady():
+    leds = _all(196, "FFFFFF")
+    d50 = workshop.build_d50_from_leds(leds, "Steady", 50)
+    # Expect a single-color palette, single 196-LED group, steady tail.
+    assert d50 == "N01:P10001FFFFFFF21000100C4U3V3000640000E1;"
+
+
+def test_build_d50_from_leds_treats_None_as_black():
+    leds = _all(196, None)
+    d50 = workshop.build_d50_from_leds(leds, "Steady", 50)
+    assert d50 == "N01:P10001000000F21000100C4U3V3000640000E1;"
+
+
+def test_build_d50_from_leds_two_color_compression():
+    # Outer 88 red, middle+inner 108 off (matches the all-outer-only DIY capture).
+    leds = _all(88, "FF0000") + _all(108, None)
+    d50 = workshop.build_d50_from_leds(leds, "Steady", 50)
+    assert d50 == "N01:P10002FF0000000000F2100020058006CU3V3000640000E1;"
+
+
+def test_build_d50_from_leds_three_ring_pattern():
+    # Outer white, middle blue, inner yellow — same shape as a real DIY capture.
+    leds = _all(88, "FFFFFF") + _all(62, "0000FF") + _all(46, "FFFF00")
+    d50 = workshop.build_d50_from_leds(leds, "Steady", 50)
+    assert d50 == "N01:P10003FFFFFF0000FFFFFF00F2100030058003E002EU3V3000640000E1;"
+
+
+def test_build_d50_from_leds_single_LED_lit():
+    # 47 white + 1 red + 148 white.
+    leds = _all(47, "FFFFFF") + ["FF0000"] + _all(148, "FFFFFF")
+    d50 = workshop.build_d50_from_leds(leds, "Steady", 50)
+    # The palette has 3 colors (white, red, white) because duplicates ARE allowed
+    # and group K uses palette index K — see D50_FORMAT.md.
+    assert d50 == "N01:P10003FFFFFFFF0000FFFFFFF210003002F00010094U3V3000640000E1;"
+
+
+def test_build_d50_from_leds_circle_effect_changes_tail_only():
+    leds = _all(196, "FFFFFF")
+    steady = workshop.build_d50_from_leds(leds, "Steady", 50)
+    circle = workshop.build_d50_from_leds(leds, "Circle", 50)
+    # palette + lengths are identical; only the tail after U3V3 changes.
+    assert steady.split("U3V3")[0] == circle.split("U3V3")[0]
+    assert steady.endswith("000640000E1;")
+    assert circle.endswith("C2O60088;")  # speed 50 → 0088
+
+
+def test_build_d50_from_leds_lowercase_hex_normalized_to_uppercase():
+    leds = _all(196, "ff8000")
+    d50 = workshop.build_d50_from_leds(leds, "Steady", 50)
+    assert "FF8000" in d50
+    assert "ff8000" not in d50
+
+
+def test_build_d50_from_leds_rejects_wrong_length():
+    with pytest.raises(ValueError):
+        workshop.build_d50_from_leds(_all(195, "FFFFFF"), "Steady", 50)
+    with pytest.raises(ValueError):
+        workshop.build_d50_from_leds(_all(197, "FFFFFF"), "Steady", 50)

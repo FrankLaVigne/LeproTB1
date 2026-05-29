@@ -180,6 +180,39 @@ def effect_tail(name: str, speed: int) -> str:
                      "Steady, Breathe, Gradient, Leftward, Rightward, Circle")
 
 
+def build_d50_from_leds(leds: list[str | None], effect: str, speed: int) -> str:
+    """Compose a full d50 string from a 196-LED array + effect + speed.
+
+    None values are treated as the color "000000" (off). Duplicate palette
+    entries are emitted as-is (verified to work by experiment 2026-05-29 —
+    see D50_FORMAT.md). The output is uppercase normalized to match what the
+    Lepro app emits.
+    """
+    if len(leds) != 196:
+        raise ValueError(f"leds must have exactly 196 entries, got {len(leds)}")
+
+    # 1. Normalize: None -> "000000", uppercase everything else.
+    norm = ["000000" if c is None else c.upper() for c in leds]
+
+    # 2. Compress consecutive same-color LEDs into (color, length) runs.
+    runs: list[tuple[str, int]] = []
+    for color in norm:
+        if runs and runs[-1][0] == color:
+            runs[-1] = (color, runs[-1][1] + 1)
+        else:
+            runs.append((color, 1))
+
+    # 3. Build palette (in first-appearance order, duplicates allowed) +
+    #    lengths string.
+    colors = "".join(c for c, _ in runs)
+    lengths = "".join(f"{n:04X}" for _, n in runs)
+    n_groups = len(runs)
+
+    # 4. Compose with effect tail.
+    tail = effect_tail(effect, speed)
+    return f"N01:P1000{n_groups}{colors}F21000{n_groups}{lengths}U3V3{tail};"
+
+
 async def _run_preview(preset: dict, did: str, client) -> None:
     """Cycle the preset's frames on the lamp until cancelled.
 
