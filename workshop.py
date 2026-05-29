@@ -8,7 +8,15 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
+import logging
+import os
 import re
+from pathlib import Path
+
+from aiohttp import web
+
+from lepro import LeproClient, LeproError, load_config
 
 # Match P1000<count><colors>. Count is a single decimal digit (1-9 verified;
 # REVERSE_ENGINEERING.md caps at 9). Colors are distinct 6-hex RGB tuples.
@@ -119,3 +127,109 @@ async def _run_preview(preset: dict, did: str, client) -> None:
                 await asyncio.sleep(dur_ms / 1000)
     except asyncio.CancelledError:
         pass
+
+
+logging.basicConfig(level=logging.INFO)
+_LOG = logging.getLogger("workshop")
+
+_HERE = Path(__file__).resolve().parent
+_PRESETS_DIR = _HERE / "presets"
+
+# Module-level singletons set during lifespan startup.
+_client: LeproClient | None = None
+_preview_task: asyncio.Task | None = None
+
+
+def _load_preset(name: str) -> dict:
+    """Load presets/<name>.json or raise FileNotFoundError."""
+    _sanitize_name(name)
+    path = _PRESETS_DIR / f"{name}.json"
+    if not path.exists():
+        raise FileNotFoundError(f"preset {name!r} not found")
+    return json.loads(path.read_text())
+
+
+def _list_preset_names() -> list[str]:
+    return sorted(p.stem for p in _PRESETS_DIR.glob("*.json"))
+
+
+async def index(_req):
+    return web.Response(text=_PAGE, content_type="text/html")
+
+
+async def api_presets(_req):
+    """Return [{name, frame_count, palette}] for every preset."""
+    out = []
+    for name in _list_preset_names():
+        try:
+            p = _load_preset(name)
+        except Exception:  # noqa: BLE001
+            continue
+        frame_count = len(p["frames"]) if "frames" in p else 1
+        out.append({"name": name,
+                    "frame_count": frame_count,
+                    "palette": extract_palette(p)})
+    return web.json_response({"ok": True, "presets": out})
+
+
+async def api_preset(req):
+    name = req.match_info["name"]
+    try:
+        return web.json_response({"ok": True, "preset": _load_preset(name)})
+    except (FileNotFoundError, ValueError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+# Tiny placeholder page so smoke tests don't 500. Real UI inlined in Task 7.
+_PAGE = "<!doctype html><title>workshop</title><body>workshop loading...</body>"
+
+
+async def _on_startup(app):
+    global _client
+    cfg = load_config()
+    if not cfg["account"] or not cfg["password"]:
+        raise SystemExit("Missing credentials: create config.json or set LEPRO_ACCOUNT/LEPRO_PASSWORD.")
+    _client = LeproClient(cfg["account"], cfg["password"], cfg["region"])
+    await _client.login()
+    await _client.connect_mqtt()
+    app["listener"] = asyncio.create_task(_client.listen_forever())
+    host = os.environ.get("LEPRO_WORKSHOP_HOST", "0.0.0.0")
+    port = int(os.environ.get("LEPRO_WORKSHOP_PORT", "8081"))
+    _LOG.info("workshop ready on http://%s:%s (LAN-only; no auth)", host, port)
+
+
+async def _on_cleanup(app):
+    global _preview_task, _client
+    if _preview_task and not _preview_task.done():
+        _preview_task.cancel()
+        try:
+            await _preview_task
+        except asyncio.CancelledError:
+            pass
+    app["listener"].cancel()
+    if _client is not None:
+        await _client.close()
+    _client = None
+    _preview_task = None
+
+
+def build_app() -> web.Application:
+    app = web.Application()
+    app.add_routes([
+        web.get("/", index),
+        web.get("/api/presets", api_presets),
+        web.get(r"/api/presets/{name}", api_preset),
+    ])
+    app.on_startup.append(_on_startup)
+    app.on_cleanup.append(_on_cleanup)
+    return app
+
+
+def main() -> None:
+    host = os.environ.get("LEPRO_WORKSHOP_HOST", "0.0.0.0")
+    port = int(os.environ.get("LEPRO_WORKSHOP_PORT", "8081"))
+    web.run_app(build_app(), host=host, port=port)
+
+
+if __name__ == "__main__":
+    main()
