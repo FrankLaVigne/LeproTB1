@@ -460,7 +460,8 @@ function renderRing(ring, data) {
   }
   const lastTick = data.recent_ticks && data.recent_ticks[0];
   const dir = lastTick ? lastTick.direction : '';
-  meta.textContent = `${arrow(dir)} ${colorName(data.color)} \\u00b7 updated ${timeAgo(data.last_fetch_at)}`;
+  const fast = data.is_fast ? ' \\u2022 \\u26a1 FAST' : '';
+  meta.textContent = `${arrow(dir)} ${colorName(data.color)} \\u00b7 updated ${timeAgo(data.last_fetch_at)}${fast}`;
   history.textContent = (data.recent_ticks || []).slice(0, 5).map(t =>
     `${arrow(t.direction)}$${t.price.toFixed(2)} ${t.at.slice(11, 16)}`
   ).join(' \\u00b7 ');
