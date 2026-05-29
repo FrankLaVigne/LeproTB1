@@ -663,6 +663,7 @@ async def api_preview(req):
     global _preview_task
     try:
         body = await req.json()
+        _check_ticker_mutex()
         base_name = body["base_name"]
         color_map = body.get("color_map") or {}
         preset = _load_preset(base_name)
@@ -677,6 +678,8 @@ async def api_preview(req):
                 pass
         _preview_task = asyncio.create_task(_run_preview(recolored, did, _client))
         return web.json_response({"ok": True})
+    except web.HTTPConflict:
+        raise
     except (LeproError, ValueError, KeyError, FileNotFoundError) as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
@@ -737,6 +740,7 @@ def _validate_leds(leds) -> None:
 async def api_diy_paint(req):
     try:
         body = await req.json()
+        _check_ticker_mutex()
         leds = body["leds"]
         effect = body.get("effect", "Steady")
         speed = int(body.get("speed", 50))
@@ -748,6 +752,8 @@ async def api_diy_paint(req):
         d50 = build_d50_from_leds(leds, effect, speed)
         await _client.send_raw({"d1": 1, "d2": 2, "d50": d50})
         return web.json_response({"ok": True})
+    except web.HTTPConflict:
+        raise
     except (LeproError, ValueError, KeyError, TypeError) as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
@@ -793,6 +799,91 @@ async def api_brightness(req):
         return web.json_response({"ok": True})
     except (LeproError, ValueError, KeyError, TypeError) as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+# --- Stock ticker endpoints ---------------------------------------------------
+
+import ticker as _ticker_mod  # alias keeps namespace tidy
+
+_ticker_session = None  # type: ignore[assignment]
+
+
+def _check_ticker_mutex():
+    """Raise web.HTTPConflict if the ticker session is running."""
+    global _ticker_session
+    if _ticker_session is not None and _ticker_session.running:
+        raise web.HTTPConflict(
+            text='{"ok": false, "error": "stock ticker is running; stop it first"}',
+            content_type="application/json",
+        )
+
+
+async def api_ticker_start(req):
+    global _ticker_session
+    try:
+        body = await req.json()
+        interval = int(body.get("interval", 30))
+        symbols = {}
+        for ring in ("outer", "middle", "inner"):
+            sym = body.get(ring)
+            if sym is not None and str(sym).strip() != "":
+                symbols[ring] = str(sym).strip().upper()
+        if not symbols:
+            return web.json_response(
+                {"ok": False, "error": "at least one symbol required"},
+                status=400,
+            )
+        if _ticker_session is not None and _ticker_session.running:
+            return web.json_response(
+                {"ok": False, "error": "stock ticker already running"},
+                status=409,
+            )
+        import asyncio
+        # First-sample fetch for every symbol; if any return None, abort.
+        results = await asyncio.gather(
+            *[asyncio.to_thread(_ticker_mod.fetch_price, s) for s in symbols.values()]
+        )
+        baselines = {}
+        failed = []
+        for (ring, sym), price in zip(symbols.items(), results):
+            if price is None:
+                failed.append(sym)
+            else:
+                baselines[ring] = price
+        if failed:
+            return web.json_response(
+                {"ok": False, "error": f"could not fetch first price for: {', '.join(failed)}"},
+                status=400,
+            )
+        sess = _ticker_mod.TickerSession(_client, symbols, interval)
+        for ring, price in baselines.items():
+            sess.set_baseline(ring, price)
+        await sess.start()
+        _ticker_session = sess
+        snap = sess.snapshot()
+        return web.json_response(
+            {"ok": True, "since": snap["since"], "baselines": baselines}
+        )
+    except (ValueError, KeyError, TypeError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+async def api_ticker_stop(_req):
+    global _ticker_session
+    if _ticker_session is None:
+        return web.json_response({"ok": True})
+    await _ticker_session.stop()
+    _ticker_session = None
+    return web.json_response({"ok": True})
+
+
+async def api_ticker_state(_req):
+    if _ticker_session is None:
+        return web.json_response({
+            "running": False, "since": None, "interval": None,
+            "flash_until": None, "rings": None,
+        })
+    return web.json_response(_ticker_session.snapshot())
 
 
 # Tiny placeholder page so smoke tests don't 500. Real UI inlined in Task 7.
@@ -1043,6 +1134,9 @@ def build_app() -> web.Application:
         web.post("/api/diy/paint", api_diy_paint),
         web.post("/api/diy/save", api_diy_save),
         web.post("/api/brightness", api_brightness),
+        web.post("/api/ticker/start", api_ticker_start),
+        web.post("/api/ticker/stop", api_ticker_stop),
+        web.get("/api/ticker/state", api_ticker_state),
     ])
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
