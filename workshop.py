@@ -357,6 +357,84 @@ async def api_save(req):
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
 
+# --- DIY page route handlers --------------------------------------------------
+
+
+_VALID_EFFECTS = {"Steady", "Breathe", "Gradient", "Leftward", "Rightward", "Circle"}
+_HEX6 = re.compile(r"^[0-9A-Fa-f]{6}$")
+
+
+def _validate_leds(leds) -> None:
+    if not isinstance(leds, list) or len(leds) != 196:
+        raise ValueError("leds must be a list of exactly 196 entries")
+    for i, c in enumerate(leds):
+        if c is None:
+            continue
+        if not (isinstance(c, str) and _HEX6.match(c)):
+            raise ValueError(f"leds[{i}] = {c!r} is not a 6-hex string or null")
+
+
+async def api_diy_paint(req):
+    try:
+        body = await req.json()
+        leds = body["leds"]
+        effect = body.get("effect", "Steady")
+        speed = int(body.get("speed", 50))
+        _validate_leds(leds)
+        if effect not in _VALID_EFFECTS:
+            raise ValueError(f"unknown effect {effect!r}")
+        if not 0 <= speed <= 100:
+            raise ValueError(f"speed must be 0..100, got {speed}")
+        d50 = build_d50_from_leds(leds, effect, speed)
+        await _client.send_raw({"d1": 1, "d2": 2, "d50": d50})
+        return web.json_response({"ok": True})
+    except (LeproError, ValueError, KeyError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+async def api_diy_save(req):
+    try:
+        body = await req.json()
+        name = _sanitize_name(body["name"])
+        leds = body["leds"]
+        effect = body.get("effect", "Steady")
+        speed = int(body.get("speed", 50))
+        _validate_leds(leds)
+        if effect not in _VALID_EFFECTS:
+            raise ValueError(f"unknown effect {effect!r}")
+        path = _PRESETS_DIR / f"{name}.json"
+        if path.exists():
+            return web.json_response(
+                {"ok": False,
+                 "error": f"preset {name!r} already exists; pick a unique name"},
+                status=400)
+        d50 = build_d50_from_leds(leds, effect, speed)
+        from datetime import date
+        preset = {
+            "name": name,
+            "description": "Built in the DIY editor.",
+            "captured": date.today().isoformat(),
+            "prompt": "DIY editor",
+            "payload": {"d1": 1, "d2": 2, "d50": d50},
+        }
+        path.write_text(json.dumps(preset, indent=2) + "\n")
+        return web.json_response({"ok": True, "path": str(path.relative_to(_HERE))})
+    except (ValueError, KeyError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+async def api_brightness(req):
+    try:
+        body = await req.json()
+        value = int(body["value"])
+        if not 0 <= value <= 1000:
+            raise ValueError(f"brightness value must be 0..1000, got {value}")
+        await _client.send_raw({"d52": value})
+        return web.json_response({"ok": True})
+    except (LeproError, ValueError, KeyError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
 # Tiny placeholder page so smoke tests don't 500. Real UI inlined in Task 7.
 _PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -596,6 +674,11 @@ def build_app() -> web.Application:
         web.post("/api/preview", api_preview),
         web.post("/api/stop", api_stop),
         web.post("/api/save", api_save),
+        # DIY page (handler added in Task 5; routes registered now so the smoke
+        # check counts them). The HTML route stays a no-op until Task 5 lands.
+        web.post("/api/diy/paint", api_diy_paint),
+        web.post("/api/diy/save", api_diy_save),
+        web.post("/api/brightness", api_brightness),
     ])
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
