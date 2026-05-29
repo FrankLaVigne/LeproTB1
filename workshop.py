@@ -361,7 +361,7 @@ _PAGE_TICKER = """<!doctype html>
 <body><div class="wrap">
   <div class="header">
     <div class="tabs">
-      <a href="/">&#x1F3A8; Workshop</a>
+      <a href="/">&#x1F3A8; Presets</a>
       <a href="/diy">&#x270F;&#xFE0F; DIY</a>
       <a href="/ticker" class="active">&#x1F4C8; Ticker</a>
       <a href="/state">&#x1F4CA; State</a>
@@ -597,7 +597,7 @@ _PAGE_STATE = """<!doctype html>
 <body><div class="wrap">
   <div class="header">
     <div class="tabs">
-      <a href="/">&#x1F3A8; Workshop</a>
+      <a href="/">&#x1F3A8; Presets</a>
       <a href="/diy">&#x270F;&#xFE0F; DIY</a>
       <a href="/ticker">&#x1F4C8; Ticker</a>
       <a href="/state" class="active">&#x1F4CA; State</a>
@@ -672,7 +672,8 @@ function parseD50_N01(d50) {
   // Parse our N01 format. Returns 196-entry array in physical-space, or null
   // if the format is not the simple per-LED Steady/effect d50 we generate.
   if (!d50 || typeof d50 !== 'string') return null;
-  const m = d50.match(/^N01:P1000([0-9]+)([0-9A-Fa-f]+)F21000([0-9]+)([0-9A-Fa-f]+)U3V3/);
+  // N and G are single digits in our format (max 9 groups).
+  const m = d50.match(/^N01:P1000([0-9])([0-9A-Fa-f]+)F21000([0-9])([0-9A-Fa-f]+)U3V3/);
   if (!m) return null;
   const N = parseInt(m[1], 10);
   const colors = m[2];
@@ -910,7 +911,7 @@ _PAGE_DIY = """<!doctype html>
 <body><div class="wrap">
   <div class="header">
     <div class="tabs">
-      <a href="/">&#x1F3A8; Workshop</a>
+      <a href="/">&#x1F3A8; Presets</a>
       <a href="/diy" class="active">&#x270F;&#xFE0F; DIY</a>
       <a href="/ticker">&#x1F4C8; Ticker</a>
       <a href="/state">&#x1F4CA; State</a>
@@ -1299,7 +1300,7 @@ async def api_save(req):
         base = _load_preset(base_name)
         recolored = apply_color_map(base, color_map)
         recolored["name"] = new_name
-        recolored["prompt"] = f"{base_name} recolored via workshop"
+        recolored["prompt"] = f"{base_name} recolored via presets editor"
         from datetime import date
         recolored["captured"] = date.today().isoformat()
         path.write_text(json.dumps(recolored, indent=2) + "\n")
@@ -1499,7 +1500,7 @@ async def index_state(_req):
 _PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lepro Preset Workshop</title>
+<title>Lepro Presets</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -1558,7 +1559,7 @@ _PAGE = """<!doctype html>
   <div class="card">
     <div class="header">
       <div class="tabs">
-        <a href="/" class="active" style="color:#5fd9d9;background:#1f2a2a;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700">🎨 Workshop</a>
+        <a href="/" class="active" style="color:#5fd9d9;background:#1f2a2a;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700">🎨 Presets</a>
         <a href="/diy" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">✏️ DIY</a>
         <a href="/ticker" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">📈 Ticker</a>
         <a href="/state" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">📊 State</a>
