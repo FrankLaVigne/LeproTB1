@@ -169,6 +169,60 @@ parser should build on this.
 | **`W`** | Wide parameter block (`W61000000e102a3` seen once). | Low |
 | **Lowercase `r` / `s` / `c` / `a`** | Not pure hex. Possibly ASCII opcodes for sub-blocks, or base-32/36 encoded values. We genuinely don't know. | Honest "?" |
 
+### Per-LED-count solid-fill decoded (2026-05-29) — EXPERIMENTALLY CONFIRMED
+
+A capture from the Lepro app's **DIY screen** with all 196 LEDs filled solid
+orange produced this d50:
+
+```
+N01:P10001FFAA00F21000100C4U3V3000640000E1;
+```
+
+This is **byte-identical in shape to the strip-protocol "solid color" format**
+from the reference integration, but with the total length matching the TB1's
+actual LED count rather than the reference's 25-segment strip assumption.
+
+Decoded:
+
+| Segment | Meaning | Value |
+|---|---|---|
+| `N01:` | single program (whole-lamp, no per-ring split) | — |
+| `P10001` | palette: 1 color follows | 1 |
+| `FFAA00` | RGB hex for the palette color | orange |
+| `F21000` | length-per-group block header | — |
+| `1` | number of groups | 1 |
+| `00C4` | **total length of group 0 in LEDs (hex)** | **196** |
+| `U3V3` | opcode + version stubs | — |
+| `000640000E1` | "solid effect" tail | — |
+
+**`0xC4 = 196` is the exact LED count of the TB1** (88 outer + 62 middle + 46
+inner). Total group lengths sum to the lamp's full LED count, in 16-bit
+big-endian hex.
+
+### What this unlocks
+
+- **Generating arbitrary multi-segment patterns from scratch.** The format
+  generalizes to `P1000{N}{colors}F21000{G}{group_lengths}U3V3<tail>;` where
+  `{group_lengths}` is `G × 4 hex chars`, summing to 196.
+- **A clock that ticks around the rings**: `(off, K), (color, 1), (off, 196-K-1)`
+  draws a single "second hand" at any position. Adjustments per ring use the
+  per-ring `#I00:` / `#I01:` / `#I02:` format with each ring's length summing
+  to 88/62/46 respectively.
+- **Why our existing `_build_d50` doesn't work on the TB1** — it hardcodes
+  total length to 25 (the strip-protocol assumption). A small fix to accept a
+  configurable total fixes it.
+
+### Open: the DIY app exposes segments, not LEDs
+
+The Lepro app's DIY screen presents the lamp as a smaller number of paintable
+arcs per ring (visually ~15-20 outer, ~12 middle, ~9 inner). Per-LED control
+(196 individually-addressable LEDs) likely exists at a deeper level in the
+firmware (LightGPM AI uses it) but isn't exposed by the app. The
+`F21000{G}{lengths}` format above could still encode 196 individual groups of
+length 1 each — but the app won't let the user *paint* at that resolution.
+Practical resolution from app captures: ring-segment level, which is plenty
+for a clock face.
+
 ### New as of `purple-pink-tour` (2026-05-28)
 
 - **`Y`** — a brand new section marker appeared in one frame:
