@@ -641,15 +641,12 @@ _PAGE_STATE = """<!doctype html>
 </div>
 
 <script type="module">
+import { parseD50_N01, unrotateToPage } from '/static/lamp-utils.js';
+
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 
 // --- visualizer: mirrors DIY canvas, read-only -------------------------------
-// Rotation constants MUST mirror workshop.py's _OUTER/_MIDDLE/_INNER_ROTATION.
-// Apply the inverse: page[i] = physical[(i + offset) % ring_size].
-const OUTER_ROT = 31;
-const MIDDLE_ROT = 22;
-const INNER_ROT = 4;
 
 const OUTER = Array.from({length:22}, (_,i) => [i*4, i*4+4]);
 const MIDDLE = [
@@ -667,39 +664,6 @@ const RING_GEOMETRY = {
 };
 
 let vizRes = 48;
-
-function parseD50_N01(d50) {
-  // Parse our N01 format. Returns 196-entry array in physical-space, or null
-  // if the format is not the simple per-LED Steady/effect d50 we generate.
-  if (!d50 || typeof d50 !== 'string') return null;
-  // N and G are single digits in our format (max 9 groups).
-  const m = d50.match(/^N01:P1000([0-9])([0-9A-Fa-f]+)F21000([0-9])([0-9A-Fa-f]+)U3V3/);
-  if (!m) return null;
-  const N = parseInt(m[1], 10);
-  const colors = m[2];
-  if (colors.length < N * 6) return null;
-  const G = parseInt(m[3], 10);
-  const lengthsHex = m[4];
-  if (lengthsHex.length < G * 4) return null;
-  const palette = [];
-  for (let i = 0; i < N; i++) palette.push(colors.slice(i*6, i*6+6).toUpperCase());
-  const physical = [];
-  for (let g = 0; g < G; g++) {
-    const len = parseInt(lengthsHex.slice(g*4, g*4+4), 16);
-    const color = palette[g % N];
-    for (let j = 0; j < len; j++) physical.push(color);
-  }
-  if (physical.length !== 196) return null;
-  return physical;
-}
-
-function unrotateToPage(physical) {
-  const page = new Array(196).fill('000000');
-  for (let i = 0; i < 88; i++) page[i] = physical[(i + OUTER_ROT) % 88];
-  for (let k = 0; k < 62; k++) page[88 + k] = physical[88 + (k + MIDDLE_ROT) % 62];
-  for (let k = 0; k < 46; k++) page[150 + k] = physical[150 + (k + INNER_ROT) % 46];
-  return page;
-}
 
 function arcPath(r0, r1, a0, a1) {
   const toXY = (r, a) => [r*Math.cos(a), r*Math.sin(a)];
@@ -1194,42 +1158,14 @@ svg.addEventListener('mouseover', e => {
   }
 });
 
-// --- restore state from the lamp on mount (so nav-away-and-back keeps
-// the canvas in sync with the physical lamp). Mirrors the state-tab
-// visualizer's parse + unrotate logic.
-const _OUTER_ROT = 31, _MIDDLE_ROT = 22, _INNER_ROT = 4;
-function _parseD50(d50) {
-  if (!d50 || typeof d50 !== 'string') return null;
-  const m = d50.match(/^N01:P1000([0-9])([0-9A-Fa-f]+)F21000([0-9])([0-9A-Fa-f]+)U3V3/);
-  if (!m) return null;
-  const N = parseInt(m[1], 10), G = parseInt(m[3], 10);
-  const palette = [];
-  for (let i = 0; i < N; i++) palette.push(m[2].slice(i*6, i*6+6).toUpperCase());
-  const out = [];
-  for (let g = 0; g < G; g++) {
-    const len = parseInt(m[4].slice(g*4, g*4+4), 16);
-    const c = palette[g % N];
-    for (let j = 0; j < len; j++) out.push(c);
-  }
-  return out.length === 196 ? out : null;
-}
-function _unrotateToPage(physical) {
-  const page = new Array(196).fill('000000');
-  for (let i = 0; i < 88; i++) page[i] = physical[(i + _OUTER_ROT) % 88];
-  for (let k = 0; k < 62; k++) page[88+k] = physical[88 + (k + _MIDDLE_ROT) % 62];
-  for (let k = 0; k < 46; k++) page[150+k] = physical[150 + (k + _INNER_ROT) % 46];
-  return page;
-}
+// Restore state from the lamp on mount (so nav-away-and-back keeps the
+// canvas in sync with the physical lamp). Uses the shared helper module.
+import { lampStateToPageLeds } from '/static/lamp-utils.js';
 async function loadLampState() {
   try {
     const j = await fetch('/api/lamp/state').then(r => r.json());
-    const dids = Object.keys(j.devices || {});
-    if (!dids.length) return;
-    const d50 = j.devices[dids[0]].d50;
-    if (!d50) return;
-    const physical = _parseD50(d50);
-    if (!physical) return;
-    const page = _unrotateToPage(physical);
+    const page = lampStateToPageLeds(j);
+    if (!page) return;
     // Treat "000000" as the DIY's null (off) so Erase / Reset stay consistent.
     state.leds = page.map(c => c === '000000' ? null : c);
     drawCanvas();
@@ -1796,6 +1732,8 @@ def build_app() -> web.Application:
         web.get("/api/ticker/state", api_ticker_state),
         web.get("/api/lamp/state", api_lamp_state),
     ])
+    # Static assets — currently just lamp-utils.js shared by /diy and /state.
+    app.router.add_static("/static", _HERE / "static")
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
     return app
