@@ -144,6 +144,7 @@ class TickerSession:
                 "last_fetch_at": None,
                 "last_fetch_ok": False,
                 "recent_ticks": [],
+                "is_fast": False,
             }
 
     @property
@@ -202,7 +203,8 @@ class TickerSession:
                 continue
             r = self._rings[ring]
             now = results[ring]
-            new_color, ticked = decide_ring_color(r["prev_price"], now, r["color"])
+            old_price = r["prev_price"]
+            new_color, ticked = decide_ring_color(old_price, now, r["color"])
             r["color"] = new_color
             r["current_price"] = now
             r["last_fetch_at"] = datetime.now().isoformat(timespec="seconds")
@@ -219,15 +221,35 @@ class TickerSession:
                 self.record_tick(ring, now if now is not None else 0.0, direction)
                 flash_color = new_color  # outer->middle->inner; last writer wins
                 r["ticked_at"] = datetime.now().isoformat(timespec="seconds")
+            elif now is not None and old_price is not None:
+                # No color change, but price still moved — record a directional
+                # tick so is_ring_fast can see sustained moves even when the
+                # ring stays the same color.
+                if now > old_price:
+                    self.record_tick(ring, now, "up")
+                elif now < old_price:
+                    self.record_tick(ring, now, "down")
 
         if flash_color is not None:
             from datetime import timedelta
             self._flash_until = (datetime.now() + timedelta(seconds=5)).isoformat(timespec="seconds")
 
-        # Decide which d50 to send: flash if we're still inside the window.
+        # After all rings have been updated this poll, recompute is_fast.
+        for ring in self._VALID_RINGS:
+            r = self._rings[ring]
+            if r is None:
+                continue
+            r["is_fast"] = is_ring_fast(r["recent_ticks"])
+
+        # Pick effect: if anyone is fast and we're not in a flash, sustained Breathe.
+        any_fast = any(
+            r is not None and r["is_fast"]
+            for r in self._rings.values()
+        )
         flashing = self._is_flashing()
         send_flash = flash_color if flashing else None
-        d50 = build_ticker_d50(self._snapshot_rings_for_d50(), send_flash)
+        base_effect = "Breathe" if any_fast else "Steady"
+        d50 = build_ticker_d50(self._snapshot_rings_for_d50(), send_flash, effect=base_effect)
 
         try:
             await self._client.send_raw({"d1": 1, "d2": 2, "d50": d50})
@@ -268,11 +290,19 @@ class TickerSession:
             while True:
                 await self._tick_once()
                 if self._is_flashing() and self._interval > 5:
-                    # Hold the Breathe flash for 5 s, then revert to Steady.
+                    # Hold the Breathe flash for 5 s, then revert to the
+                    # appropriate base effect (Breathe if any ring is fast,
+                    # Steady otherwise).
                     await asyncio.sleep(5)
-                    steady_d50 = build_ticker_d50(self._snapshot_rings_for_d50(), None)
+                    any_fast = any(
+                        r is not None and r["is_fast"]
+                        for r in self._rings.values()
+                    )
+                    revert_effect = "Breathe" if any_fast else "Steady"
+                    revert_d50 = build_ticker_d50(
+                        self._snapshot_rings_for_d50(), None, effect=revert_effect)
                     try:
-                        await self._client.send_raw({"d1": 1, "d2": 2, "d50": steady_d50})
+                        await self._client.send_raw({"d1": 1, "d2": 2, "d50": revert_d50})
                     except Exception:  # noqa: BLE001
                         pass
                     # Clear the flash window now that we've reverted.

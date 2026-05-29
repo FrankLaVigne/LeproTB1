@@ -495,3 +495,78 @@ def test_build_ticker_d50_flash_color_takes_precedence_over_effect():
     a = ticker.build_ticker_d50(rings, flash_color="00FF00", effect="Steady")
     b = ticker.build_ticker_d50(rings, flash_color="00FF00", effect="Breathe")
     assert a == b
+
+
+# --- TickerSession fast-mode tests --------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_tick_once_marks_ring_as_fast_after_sustained_uptrend():
+    client = _FakeClient()
+    sess = ticker.TickerSession(client=client,
+                                 symbols={"outer": "AAPL"},
+                                 interval=10)
+    sess.set_baseline("outer", 100.0)
+    # Three successive upticks of ~0.6% each.
+    prices = iter([100.6, 101.2, 101.8])
+
+    async def _one():
+        return {"outer": next(prices)}
+    sess._fetch_all = _one
+
+    await sess._tick_once()
+    await sess._tick_once()
+    await sess._tick_once()
+
+    snap = sess.snapshot()
+    assert snap["rings"]["outer"]["is_fast"] is True
+
+
+@pytest.mark.asyncio
+async def test_tick_once_clears_is_fast_after_direction_change():
+    client = _FakeClient()
+    sess = ticker.TickerSession(client=client,
+                                 symbols={"outer": "AAPL"},
+                                 interval=10)
+    sess.set_baseline("outer", 100.0)
+    # Three upticks, then a downtick -> mixed window -> not fast.
+    prices = iter([100.6, 101.2, 101.8, 101.0])
+
+    async def _one():
+        return {"outer": next(prices)}
+    sess._fetch_all = _one
+
+    for _ in range(4):
+        await sess._tick_once()
+
+    snap = sess.snapshot()
+    assert snap["rings"]["outer"]["is_fast"] is False
+
+
+@pytest.mark.asyncio
+async def test_tick_once_sends_breathe_multicolor_d50_when_fast_and_no_flash():
+    client = _FakeClient()
+    sess = ticker.TickerSession(client=client,
+                                 symbols={"outer": "AAPL"},
+                                 interval=10)
+    sess.set_baseline("outer", 100.0)
+    prices = iter([100.6, 101.2, 101.8, 101.9])
+
+    async def _one():
+        return {"outer": next(prices)}
+    sess._fetch_all = _one
+
+    # Run 3 ticks to establish "fast"; force the flash window to expire each time.
+    for _ in range(3):
+        await sess._tick_once()
+        sess._flash_until = None
+
+    # Fourth tick: a small uptick, no new direction change (color stays green
+    # so no flash), but ring is fast. The d50 should be Breathe (E4 tail)
+    # over the multi-color palette (not the single-color flash form).
+    await sess._tick_once()
+    payload = client.sent[-1]
+    assert "E4" in payload["d50"]
+    # Multi-color palette: N>=2 (outer green vs middle/inner off). The
+    # single-color flash form would be P10001<hex>.
+    assert payload["d50"].startswith("N01:P10003") or payload["d50"].startswith("N01:P10002")
