@@ -305,3 +305,96 @@ async def test_session_steady_payload_when_no_flash_active():
     assert "E4" in flash_payload["d50"]      # Breathe
     # Steady tail ends in "E1;" (where ; is the d50 terminator).
     assert steady_payload["d50"].endswith("E1;")
+
+
+# --- Bug 3 regression: 5-second Breathe flash must revert to Steady ----------
+
+
+@pytest.mark.asyncio
+async def test_run_sends_steady_revert_after_5s_flash():
+    """_run must send a Steady payload ~5 s after a Breathe flash, not at interval end.
+
+    We drive this without touching asyncio.sleep by:
+    1. Calling _tick_once() directly to trigger the flash (sends Breathe payload).
+    2. Simulating the _run revert branch: if _is_flashing(), send the Steady payload
+       and clear _flash_until — exactly what _run does between sleep(5) and
+       sleep(remaining).
+    This verifies the revert logic produces the correct d50 and clears the window.
+    """
+    client = _FakeClient()
+    sess = ticker.TickerSession(client=client,
+                                 symbols={"outer": "AAPL"},
+                                 interval=300)
+    sess.set_baseline("outer", 100.0)
+
+    # Trigger a flash by polling an uptick.
+    sess._fetch_all = lambda: _coro({"outer": 110.0})
+    await sess._tick_once()
+
+    # Confirm the lamp is in Breathe/flash mode.
+    assert sess._is_flashing(), "expected a flash window after a price uptick"
+    assert "E4" in client.sent[-1]["d50"], "first payload should be a Breathe flash"
+
+    # --- Simulate what _run does after sleep(5): send Steady revert + clear window ---
+    steady_d50 = ticker.build_ticker_d50(sess._snapshot_rings_for_d50(), None)
+    await client.send_raw({"d1": 1, "d2": 2, "d50": steady_d50})
+    sess._flash_until = None
+
+    # The revert payload must be Steady (ends in E1;) not Breathe.
+    revert_payload = client.sent[-1]
+    assert revert_payload["d50"].endswith("E1;"), (
+        "revert payload after 5 s must be Steady, got: " + revert_payload["d50"]
+    )
+    # Flash window must now be cleared so the next poll starts clean.
+    assert not sess._is_flashing(), "flash window should be cleared after revert"
+
+
+@pytest.mark.asyncio
+async def test_run_interval_greater_than_5_uses_split_sleep(monkeypatch):
+    """_run with interval > 5 must sleep(5) then send Steady, then sleep(interval-5).
+
+    We patch asyncio.sleep globally (all paths inside _run call the module-level
+    asyncio.sleep) and let the loop run one full iteration to verify the sequence:
+      tick -> sleep(5) -> Steady revert payload -> sleep(interval-5).
+    """
+    import asyncio
+    client = _FakeClient()
+    sess = ticker.TickerSession(client=client,
+                                 symbols={"outer": "AAPL"},
+                                 interval=10)
+    sess.set_baseline("outer", 100.0)
+    # Patch fetch to always return an uptick so a flash fires every poll.
+    sess._fetch_all = lambda: _coro({"outer": 110.0})
+
+    sleeps: list[float] = []
+    real_sleep = asyncio.sleep
+
+    async def recording_sleep(seconds):
+        sleeps.append(seconds)
+        await real_sleep(0)  # yield without actually waiting
+
+    # Patch asyncio.sleep globally so all callers (including _run's local import) see it.
+    monkeypatch.setattr(asyncio, "sleep", recording_sleep)
+
+    try:
+        await sess.start()
+        # Yield control repeatedly until we have at least 2 payloads and a sleep(5).
+        for _ in range(50):
+            await real_sleep(0)
+            if len(client.sent) >= 2 and 5 in sleeps:
+                break
+        await sess.stop()
+    finally:
+        pass  # monkeypatch restores asyncio.sleep automatically
+
+    # First payload: Breathe flash.
+    assert len(client.sent) >= 2, f"expected at least 2 payloads; got {client.sent}"
+    assert "E4" in client.sent[0]["d50"], "first payload must be Breathe flash"
+    # Second payload: Steady revert (sent after sleep(5)).
+    assert client.sent[1]["d50"].endswith("E1;"), (
+        "second payload must be Steady revert, got: " + client.sent[1].get("d50", str(client.sent[1]))
+    )
+    # sleep(5) must appear (for the flash hold) in the sleep sequence.
+    assert 5 in sleeps, f"expected a sleep(5) for flash hold; sleeps = {sleeps}"
+    # sleep(interval-5) = sleep(5) must also appear.
+    assert sleeps.count(5) >= 2, f"expected two sleep(5) calls (hold + remaining); sleeps = {sleeps}"

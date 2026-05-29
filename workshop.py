@@ -895,10 +895,21 @@ async def api_preset(req):
 
 
 async def api_power(req):
-    """Turn the lamp on or off (does NOT cancel a running preview — orthogonal)."""
+    """Turn the lamp on or off.
+
+    Power-off implicitly stops the ticker (spec: "calls the same shutdown path
+    as /api/ticker/stop") so the next poll cannot re-assert d50 and silently
+    undo the user's power-off. Power-on leaves the ticker state unchanged.
+    """
+    global _ticker_session
     try:
         body = await req.json()
         on = bool(body.get("on"))
+        if not on:
+            # Spec: power-off stops the ticker first.
+            if _ticker_session is not None and _ticker_session.running:
+                await _ticker_session.stop()
+                _ticker_session = None
         await _client.power(on)
         return web.json_response({"ok": True, "on": on})
     except (LeproError, ValueError, KeyError) as e:
@@ -931,7 +942,11 @@ async def api_preview(req):
 
 
 async def api_stop(_req):
-    global _preview_task
+    global _preview_task, _ticker_session
+    # Spec: POST /api/stop is a "stop everything" gesture — stop the ticker too.
+    if _ticker_session is not None and _ticker_session.running:
+        await _ticker_session.stop()
+        _ticker_session = None
     if _preview_task and not _preview_task.done():
         _preview_task.cancel()
         try:

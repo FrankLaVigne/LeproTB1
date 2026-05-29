@@ -230,12 +230,30 @@ class TickerSession:
         self._task = loop.create_task(self._run())
 
     async def _run(self):
-        """The loop body — driven by start(), cancellable by stop()."""
+        """The loop body — driven by start(), cancellable by stop().
+
+        After a tick that triggers a Breathe flash, hold the flash for 5 seconds
+        then send a Steady-revert payload so the lamp doesn't stay in Breathe
+        mode for the full poll interval (which can be up to 5 minutes).
+        """
         import asyncio
         try:
             while True:
                 await self._tick_once()
-                await asyncio.sleep(self._interval)
+                if self._is_flashing() and self._interval > 5:
+                    # Hold the Breathe flash for 5 s, then revert to Steady.
+                    await asyncio.sleep(5)
+                    steady_d50 = build_ticker_d50(self._snapshot_rings_for_d50(), None)
+                    try:
+                        await self._client.send_raw({"d1": 1, "d2": 2, "d50": steady_d50})
+                    except Exception:  # noqa: BLE001
+                        pass
+                    # Clear the flash window now that we've reverted.
+                    self._flash_until = None
+                    remaining = max(0, self._interval - 5)
+                    await asyncio.sleep(remaining)
+                else:
+                    await asyncio.sleep(self._interval)
         except asyncio.CancelledError:
             pass
 
