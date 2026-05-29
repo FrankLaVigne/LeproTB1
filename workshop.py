@@ -1194,8 +1194,51 @@ svg.addEventListener('mouseover', e => {
   }
 });
 
+// --- restore state from the lamp on mount (so nav-away-and-back keeps
+// the canvas in sync with the physical lamp). Mirrors the state-tab
+// visualizer's parse + unrotate logic.
+const _OUTER_ROT = 31, _MIDDLE_ROT = 22, _INNER_ROT = 4;
+function _parseD50(d50) {
+  if (!d50 || typeof d50 !== 'string') return null;
+  const m = d50.match(/^N01:P1000([0-9])([0-9A-Fa-f]+)F21000([0-9])([0-9A-Fa-f]+)U3V3/);
+  if (!m) return null;
+  const N = parseInt(m[1], 10), G = parseInt(m[3], 10);
+  const palette = [];
+  for (let i = 0; i < N; i++) palette.push(m[2].slice(i*6, i*6+6).toUpperCase());
+  const out = [];
+  for (let g = 0; g < G; g++) {
+    const len = parseInt(m[4].slice(g*4, g*4+4), 16);
+    const c = palette[g % N];
+    for (let j = 0; j < len; j++) out.push(c);
+  }
+  return out.length === 196 ? out : null;
+}
+function _unrotateToPage(physical) {
+  const page = new Array(196).fill('000000');
+  for (let i = 0; i < 88; i++) page[i] = physical[(i + _OUTER_ROT) % 88];
+  for (let k = 0; k < 62; k++) page[88+k] = physical[88 + (k + _MIDDLE_ROT) % 62];
+  for (let k = 0; k < 46; k++) page[150+k] = physical[150 + (k + _INNER_ROT) % 46];
+  return page;
+}
+async function loadLampState() {
+  try {
+    const j = await fetch('/api/lamp/state').then(r => r.json());
+    const dids = Object.keys(j.devices || {});
+    if (!dids.length) return;
+    const d50 = j.devices[dids[0]].d50;
+    if (!d50) return;
+    const physical = _parseD50(d50);
+    if (!physical) return;
+    const page = _unrotateToPage(physical);
+    // Treat "000000" as the DIY's null (off) so Erase / Reset stay consistent.
+    state.leds = page.map(c => c === '000000' ? null : c);
+    drawCanvas();
+  } catch (e) { /* silent — keep blank canvas on any failure */ }
+}
+
 drawCanvas();
 setDefaultName();
+loadLampState();
 </script></body></html>"""
 
 
