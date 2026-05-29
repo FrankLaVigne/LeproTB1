@@ -197,3 +197,18 @@ def test_ticker_session_snapshot_serializable_via_json():
     sess.record_tick("middle", price=139.10, direction="up")
     # Should not raise.
     assert json.dumps(sess.snapshot())
+
+
+def test_ticker_session_snapshot_isolated_from_session_state():
+    # Mutating the snapshot must NOT corrupt the live session.
+    sess = ticker.TickerSession(client=None,
+                                 symbols={"outer": "AAPL"},
+                                 interval=10)
+    sess.set_baseline("outer", 100.0)
+    snap = sess.snapshot()
+    snap["rings"]["outer"]["color"] = "ZZZZZZ"
+    snap["rings"]["outer"]["recent_ticks"].append({"hacked": True})
+    # Live session should be untouched.
+    fresh = sess.snapshot()
+    assert fresh["rings"]["outer"]["color"] == "FFFFFF"
+    assert fresh["rings"]["outer"]["recent_ticks"] == []

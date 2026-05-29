@@ -7,6 +7,9 @@ tick triggers a 5-second whole-lamp Breathe flash in the new color.
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Optional
+
 # Per-ring color codes (also re-used by build_ticker_d50 and the page).
 COLOR_OFF = "000000"
 COLOR_WHITE = "FFFFFF"   # baseline / first sample
@@ -80,10 +83,6 @@ def fetch_price(symbol):
         return None
 
 
-from datetime import datetime
-from typing import Optional
-
-
 class TickerSession:
     """Holds per-ring state for one polling session.
 
@@ -149,10 +148,11 @@ class TickerSession:
 
     def snapshot(self):
         """Return a JSON-serialisable dict — exact shape documented in spec."""
+        import copy
         return {
             "running": self.running,
             "since": self._since,
             "interval": self._interval,
             "flash_until": self._flash_until,
-            "rings": dict(self._rings),
+            "rings": {k: copy.deepcopy(v) for k, v in self._rings.items()},
         }
