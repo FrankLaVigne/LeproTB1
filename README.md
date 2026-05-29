@@ -150,6 +150,15 @@ sliders, and Save (which writes a single-frame preset into `presets/`). Every
 stroke updates the lamp live via the cloud, with client-side 100 ms throttling
 to coalesce drag movements.
 
+A **Stock Ticker** page is available at `http://<vm-ip>:8081/ticker` — assign up
+to three Yahoo Finance symbols (one per concentric ring), pick a poll interval
+(10s / 30s / 60s / 5m), and Start. Each ring shows its symbol's most recent
+direction as a solid color (green ↑, red ↓, yellow on fetch failure, white
+baseline, off if no symbol), and every tick triggers a 5-second whole-lamp
+breathe flash in the new color. Stop powers the lamp off. While the ticker is
+running, the DIY paint endpoint and the workshop preview endpoint return HTTP
+409 — power, brightness, and saves stay available.
+
 ## Protocol notes
 
 Control commands are an MQTT publish to `le/{deviceId}/prp/set` with payload
