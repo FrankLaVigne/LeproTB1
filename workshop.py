@@ -126,6 +126,37 @@ _RING_SEGMENTS = {
 }
 
 
+# Page-to-physical rotation (see CALIBRATION.md). The DIY canvas draws each
+# ring's segment 0 at 12 o'clock, but the LED strip enters each ring at a
+# different physical angle (outer/middle ~8 o'clock, inner ~11 o'clock).
+# Applied at the page↔protocol boundary in api_diy_paint and api_diy_save.
+# Tune these by ±1-3 if markers look off-center on the lamp.
+_OUTER_ROTATION = 29
+_MIDDLE_ROTATION = 21
+_INNER_ROTATION = 4
+
+
+def apply_lamp_rotation(page_leds: list) -> list:
+    """Rotate a 196-LED page-space array into the lamp's physical orientation.
+
+    The user paints colors into a page-model array where index 0 of each ring
+    sits at the top of the on-screen canvas. The physical lamp wires its strip
+    so each ring's LED 0 lands somewhere else (outer/middle ~8 o'clock, inner
+    ~11). This rotates each ring independently so the painted top lands at the
+    physical top. Raises ValueError if the input isn't exactly 196 entries.
+    """
+    if len(page_leds) != 196:
+        raise ValueError(f"expected 196 LEDs, got {len(page_leds)}")
+    physical = [None] * 196
+    for i in range(88):
+        physical[(i + _OUTER_ROTATION) % 88] = page_leds[i]
+    for k in range(62):
+        physical[88 + (k + _MIDDLE_ROTATION) % 62] = page_leds[88 + k]
+    for k in range(46):
+        physical[150 + (k + _INNER_ROTATION) % 46] = page_leds[150 + k]
+    return physical
+
+
 def segments_to_leds(ring: str, segment_idx: int) -> range:
     """Return the range of LED indices for a given (ring, segment) pair.
 
@@ -1011,7 +1042,7 @@ async def api_diy_paint(req):
             raise ValueError(f"unknown effect {effect!r}")
         if not 0 <= speed <= 100:
             raise ValueError(f"speed must be 0..100, got {speed}")
-        d50 = build_d50_from_leds(leds, effect, speed)
+        d50 = build_d50_from_leds(apply_lamp_rotation(leds), effect, speed)
         await _client.send_raw({"d1": 1, "d2": 2, "d50": d50})
         return web.json_response({"ok": True})
     except web.HTTPConflict:
@@ -1036,7 +1067,7 @@ async def api_diy_save(req):
                 {"ok": False,
                  "error": f"preset {name!r} already exists; pick a unique name"},
                 status=400)
-        d50 = build_d50_from_leds(leds, effect, speed)
+        d50 = build_d50_from_leds(apply_lamp_rotation(leds), effect, speed)
         from datetime import date
         preset = {
             "name": name,

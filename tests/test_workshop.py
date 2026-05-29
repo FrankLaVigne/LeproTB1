@@ -346,3 +346,60 @@ def test_build_d50_from_leds_rejects_wrong_length():
         workshop.build_d50_from_leds(_all(195, "FFFFFF"), "Steady", 50)
     with pytest.raises(ValueError):
         workshop.build_d50_from_leds(_all(197, "FFFFFF"), "Steady", 50)
+
+
+# --- apply_lamp_rotation tests ------------------------------------------------
+
+
+def test_apply_lamp_rotation_outer_page0_lands_at_physical_29():
+    page = [None] * 196
+    page[0] = "FF0000"
+    physical = workshop.apply_lamp_rotation(page)
+    assert physical[29] == "FF0000"
+    assert physical[0] is None  # nothing painted at physical 0
+
+
+def test_apply_lamp_rotation_middle_page88_lands_at_physical_109():
+    page = [None] * 196
+    page[88] = "00FF00"
+    physical = workshop.apply_lamp_rotation(page)
+    assert physical[88 + 21] == "00FF00"
+    assert physical[88] is None
+
+
+def test_apply_lamp_rotation_inner_page150_lands_at_physical_154():
+    page = [None] * 196
+    page[150] = "0000FF"
+    physical = workshop.apply_lamp_rotation(page)
+    assert physical[150 + 4] == "0000FF"
+    assert physical[150] is None
+
+
+def test_apply_lamp_rotation_each_ring_wraps_independently():
+    # Painting page-LED at the END of each ring wraps to a low physical
+    # index within the SAME ring (not into the next ring).
+    page = [None] * 196
+    page[87] = "FF0000"   # last of outer ring
+    page[149] = "00FF00"  # last of middle ring
+    page[195] = "0000FF"  # last of inner ring
+    physical = workshop.apply_lamp_rotation(page)
+    # Outer: (87 + 29) % 88 = 28
+    assert physical[28] == "FF0000"
+    # Middle: 88 + (61 + 21) % 62 = 88 + 20 = 108
+    assert physical[108] == "00FF00"
+    # Inner: 150 + (45 + 4) % 46 = 150 + 3 = 153
+    assert physical[153] == "0000FF"
+
+
+def test_apply_lamp_rotation_preserves_total_count():
+    page = ["FF0000"] * 196
+    physical = workshop.apply_lamp_rotation(page)
+    assert physical.count("FF0000") == 196
+    assert physical.count(None) == 0
+
+
+def test_apply_lamp_rotation_rejects_wrong_length():
+    with pytest.raises(ValueError):
+        workshop.apply_lamp_rotation([None] * 195)
+    with pytest.raises(ValueError):
+        workshop.apply_lamp_rotation([None] * 197)
