@@ -460,3 +460,38 @@ def test_is_ring_fast_ignores_baseline_and_error_ticks():
         {"price": 100.0, "direction": "baseline"},
     ]
     assert ticker.is_ring_fast(ticks) is False
+
+
+# --- build_ticker_d50 effect=Breathe (multi-color) tests ----------------------
+
+
+def test_build_ticker_d50_breathe_multicolor_keeps_per_ring_palette():
+    # New: effect="Breathe" with flash_color=None keeps the per-ring palette
+    # but uses the Breathe tail (so the lamp pulses while showing per-ring
+    # directional colors).
+    import workshop
+    rings = _rings(outer="00FF00", middle="FF0000", inner="FFFF00")
+    d50 = ticker.build_ticker_d50(rings, flash_color=None, effect="Breathe")
+    expected = ("N01:P1000300FF00FF0000FFFF00"
+                "F2100030058003E002EU3V3"
+                + workshop.effect_tail("Breathe", 50)
+                + ";")
+    assert d50 == expected
+
+
+def test_build_ticker_d50_steady_is_default_when_effect_omitted():
+    # Calling without the effect kwarg must still produce Steady (backwards
+    # compatible with the existing call sites).
+    rings = _rings(outer="00FF00", middle="FF0000", inner="FFFF00")
+    d50_default = ticker.build_ticker_d50(rings, flash_color=None)
+    d50_explicit = ticker.build_ticker_d50(rings, flash_color=None, effect="Steady")
+    assert d50_default == d50_explicit
+
+
+def test_build_ticker_d50_flash_color_takes_precedence_over_effect():
+    # When flash_color is set, the function ALWAYS does single-color Breathe
+    # regardless of the effect parameter.
+    rings = _rings(outer="00FF00", middle="FF0000", inner="FFFF00")
+    a = ticker.build_ticker_d50(rings, flash_color="00FF00", effect="Steady")
+    b = ticker.build_ticker_d50(rings, flash_color="00FF00", effect="Breathe")
+    assert a == b

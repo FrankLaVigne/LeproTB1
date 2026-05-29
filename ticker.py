@@ -67,21 +67,21 @@ def is_ring_fast(recent_ticks):
     return abs((newest - oldest) / oldest) >= FAST_THRESHOLD
 
 
-def build_ticker_d50(rings, flash_color):
+def build_ticker_d50(rings, flash_color, effect="Steady"):
     """Compose the d50 string for the lamp.
 
     ``rings`` is a dict shaped like::
         {"outer": {"color": "00FF00"}, "middle": {...}, "inner": {...}}
 
-    When ``flash_color`` is None: emits a per-ring multi-color Steady d50.
     When ``flash_color`` is non-None: emits a single-color (flash_color)
-    full-lamp Breathe d50 — the per-ring colors are intentionally hidden
-    during the 5-second flash window. (Imported here to avoid a circular
-    import: workshop.build_d50_from_leds + workshop.effect_tail are the
-    canonical d50 encoders.)
+    full-lamp Breathe d50 — used for the 5-second tick flash. The ``effect``
+    parameter is ignored in this mode.
+
+    When ``flash_color`` is None: emits a per-ring multi-color d50 with the
+    requested ``effect`` tail. ``effect="Steady"`` (default) is the normal
+    state; ``effect="Breathe"`` is the sustained "fast mode" — the per-ring
+    colors are still visible but the whole lamp pulses.
     """
-    # Local import — ticker is loaded by workshop, but the d50 helpers we
-    # need are defined at module scope in workshop, so import them here.
     from workshop import build_d50_from_leds  # noqa: PLC0415
 
     if flash_color is not None:
@@ -92,7 +92,7 @@ def build_ticker_d50(rings, flash_color):
     middle = rings["middle"]["color"]
     inner = rings["inner"]["color"]
     leds = [outer] * 88 + [middle] * 62 + [inner] * 46
-    return build_d50_from_leds(leds, "Steady", 50)
+    return build_d50_from_leds(leds, effect, 50)
 
 
 def fetch_price(symbol):
