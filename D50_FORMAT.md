@@ -212,16 +212,79 @@ big-endian hex.
   total length to 25 (the strip-protocol assumption). A small fix to accept a
   configurable total fixes it.
 
-### Open: the DIY app exposes segments, not LEDs
+### Multi-group encoding confirmed across all three rings (2026-05-29)
 
-The Lepro app's DIY screen presents the lamp as a smaller number of paintable
-arcs per ring (visually ~15-20 outer, ~12 middle, ~9 inner). Per-LED control
-(196 individually-addressable LEDs) likely exists at a deeper level in the
-firmware (LightGPM AI uses it) but isn't exposed by the app. The
-`F21000{G}{lengths}` format above could still encode 196 individual groups of
-length 1 each — but the app won't let the user *paint* at that resolution.
-Practical resolution from app captures: ring-segment level, which is plenty
-for a clock face.
+Three further captures from the DIY screen — each painting one ring at a time
+to a different color — confirm the multi-group encoding scales cleanly:
+
+| Capture | Ring(s) painted | Captured `d50` | Decoded |
+|---|---|---|---|
+| All outer | outer → red | `P10002 FF0000 000000 F21000 2 0058 006C` | 88 red + 108 off |
+| Outer + middle | outer → white, middle → blue | `P10003 FFFFFF 0000FF 000000 F21000 3 0058 003E 002E` | 88 white + 62 blue + 46 off |
+| All three | outer → white, middle → blue, inner → yellow | `P10003 FFFFFF 0000FF FFFF00 F21000 3 0058 003E 002E` | 88 white + 62 blue + 46 yellow |
+
+Ring boundaries **locked exactly** at:
+
+- Outer ring: LED indices **0 – 87** (88 LEDs, hex `0x58`)
+- Middle ring: LED indices **88 – 149** (62 LEDs, hex `0x3E`)
+- Inner ring: LED indices **150 – 195** (46 LEDs, hex `0x2E`)
+
+### App vs protocol resolution
+
+The Lepro app's DIY UI exposes 48 paintable "elements" (22 outer + 15 middle +
+11 inner), each controlling roughly 4 LEDs:
+
+| Ring | Hardware LEDs | App segments | LEDs per segment (avg) |
+|---|---|---|---|
+| Outer | 88 | 22 | 4.00 |
+| Middle | 62 | 15 | 4.13 |
+| Inner | 46 | 11 | 4.18 |
+| Total | 196 | 48 | — |
+
+The non-integer averages mean some app segments cover 4 LEDs and others 5
+(in middle and inner rings). The protocol itself addresses LEDs individually
+— in principle `(off, X), (color, 1), (off, 196-X-1)` should light exactly
+one LED at position `X` — but this **has not yet been empirically confirmed
+end-to-end**:
+
+> **Open hypothesis (high confidence, untested):** the `F21000{G}{lengths}`
+> encoding accepts `length=1` groups, giving us per-LED addressability *via
+> the protocol* even though the *app* exposes only 4-LED-quantized segments.
+>
+> To confirm: send a synthetic payload from our code (via `cli.py raw`) with a
+> single-LED group somewhere mid-ring and observe whether the lamp lights
+> exactly one LED, or rounds to the nearest 4-LED segment boundary.
+>
+> Outcome A (per-LED works): we have ~88 outer-ring positions for a clock
+> hand, plus full per-LED creative control.
+>
+> Outcome B (firmware quantizes to 4-LED segments): we're limited to ~48
+> positions across the whole lamp, matching the app's resolution. Clock is
+> still buildable, just chunkier.
+
+### The full generator format (confirmed)
+
+For static patterns on the whole lamp:
+
+```
+N01:P1000{N}{color1...colorN}F21000{G}{length1...lengthG}U3V3000640000E1;
+```
+
+Where:
+- `N` = palette color count (decimal, 1-9 verified in captures)
+- `colorK` = 6-char RGB hex (uppercase normalized; lowercase accepted)
+- `G` = group count (decimal, 1-9 verified — likely 1-3 digits per reference
+  parser, but capped at 9 in our code until empirically pushed higher)
+- `lengthK` = 4-char hex, big-endian, LED count of group K
+- **All lengths must sum to 196** (the lamp's total LED count)
+
+The order of groups maps to consecutive LED positions starting at outer ring
+LED 0. The palette is referenced by position: group K uses palette color
+index K (zero-indexed).
+
+This format is now sufficient to render any static pattern across the lamp's
+rings, at minimum 48-position resolution (app-matched) and up to 196-position
+resolution if the per-LED hypothesis holds.
 
 ### New as of `purple-pink-tour` (2026-05-28)
 
