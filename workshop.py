@@ -265,6 +265,14 @@ async def index(_req):
     return web.Response(text=_PAGE, content_type="text/html")
 
 
+async def index_diy(_req):
+    return web.Response(text=_PAGE_DIY, content_type="text/html")
+
+
+# Real DIY UI inlined in Task 6.
+_PAGE_DIY = "<!doctype html><title>diy</title><body>diy loading...</body>"
+
+
 async def api_presets(_req):
     """Return [{name, frame_count, palette}] for every preset."""
     out = []
@@ -668,6 +676,7 @@ def build_app() -> web.Application:
     app = web.Application()
     app.add_routes([
         web.get("/", index),
+        web.get("/diy", index_diy),
         web.get("/api/presets", api_presets),
         web.get(r"/api/presets/{name}", api_preset),
         web.post("/api/power", api_power),
