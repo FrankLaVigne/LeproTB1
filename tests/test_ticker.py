@@ -135,3 +135,65 @@ def test_fetch_price_returns_None_when_last_price_missing(monkeypatch):
             self.fast_info = {"last_price": None}
     monkeypatch.setattr("yfinance.Ticker", _Fake)
     assert ticker.fetch_price("AAPL") is None
+
+
+# --- TickerSession tests ------------------------------------------------------
+
+
+def test_ticker_session_initial_snapshot_not_running():
+    sess = ticker.TickerSession(client=None,
+                                 symbols={"outer": "AAPL"},
+                                 interval=30)
+    snap = sess.snapshot()
+    assert snap["running"] is False
+    assert snap["since"] is None
+    assert snap["interval"] == 30
+    assert snap["flash_until"] is None
+    # Only outer is configured; middle and inner are explicitly None.
+    assert snap["rings"]["outer"]["symbol"] == "AAPL"
+    assert snap["rings"]["outer"]["color"] == "000000"
+    assert snap["rings"]["middle"] is None
+    assert snap["rings"]["inner"] is None
+
+
+def test_ticker_session_snapshot_after_baseline_set():
+    sess = ticker.TickerSession(client=None,
+                                 symbols={"outer": "AAPL", "inner": "SPY"},
+                                 interval=10)
+    sess.set_baseline("outer", 175.10)
+    sess.set_baseline("inner", 420.00)
+    snap = sess.snapshot()
+    # Baselines don't make the session "running" — only start() does.
+    assert snap["running"] is False
+    assert snap["rings"]["outer"]["prev_price"] == 175.10
+    assert snap["rings"]["outer"]["color"] == "FFFFFF"
+    assert snap["rings"]["middle"] is None
+    assert snap["rings"]["inner"]["prev_price"] == 420.00
+    assert snap["rings"]["inner"]["color"] == "FFFFFF"
+
+
+def test_ticker_session_record_tick_caps_history_at_10():
+    sess = ticker.TickerSession(client=None,
+                                 symbols={"outer": "AAPL"},
+                                 interval=10)
+    # Push 12 ticks; only the most recent 10 should be retained.
+    for i in range(12):
+        sess.record_tick("outer", price=float(i), direction="up")
+    snap = sess.snapshot()
+    history = snap["rings"]["outer"]["recent_ticks"]
+    assert len(history) == 10
+    # Newest first: prices 11, 10, 9, ..., 2.
+    assert [t["price"] for t in history] == list(range(11, 1, -1))
+
+
+def test_ticker_session_snapshot_serializable_via_json():
+    # The snapshot must survive aiohttp.web.json_response — i.e., it can't
+    # leak datetime objects or other non-JSON types.
+    import json
+    sess = ticker.TickerSession(client=None,
+                                 symbols={"middle": "IBM"},
+                                 interval=30)
+    sess.set_baseline("middle", 138.25)
+    sess.record_tick("middle", price=139.10, direction="up")
+    # Should not raise.
+    assert json.dumps(sess.snapshot())
