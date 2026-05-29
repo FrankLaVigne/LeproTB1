@@ -168,3 +168,56 @@ async def test_run_preview_multi_frame_cycles_with_duration():
     d50s = {payload["d50"] for _, payload in client.calls}
     assert d50s == {"N01:P10001FF0000;", "N01:P1000100FF00;"}
     assert len(client.calls) >= 2
+
+
+# --- segments_to_leds tests ---------------------------------------------------
+
+
+def test_segments_to_leds_outer_first():
+    assert list(workshop.segments_to_leds("outer", 0)) == list(range(0, 4))
+
+
+def test_segments_to_leds_outer_last():
+    assert list(workshop.segments_to_leds("outer", 21)) == list(range(84, 88))
+
+
+def test_segments_to_leds_middle_first():
+    assert list(workshop.segments_to_leds("middle", 0)) == list(range(88, 92))
+
+
+def test_segments_to_leds_middle_last_two_are_five_LEDs():
+    # 13 segments of 4 then 2 segments of 5: indices 13, 14
+    assert list(workshop.segments_to_leds("middle", 13)) == list(range(140, 145))
+    assert list(workshop.segments_to_leds("middle", 14)) == list(range(145, 150))
+
+
+def test_segments_to_leds_inner_first():
+    assert list(workshop.segments_to_leds("inner", 0)) == list(range(150, 154))
+
+
+def test_segments_to_leds_inner_last_two_are_five_LEDs():
+    # 9 segments of 4 then 2 segments of 5: indices 9, 10
+    assert list(workshop.segments_to_leds("inner", 9)) == list(range(186, 191))
+    assert list(workshop.segments_to_leds("inner", 10)) == list(range(191, 196))
+
+
+def test_segments_to_leds_unknown_ring_raises():
+    with pytest.raises(ValueError):
+        workshop.segments_to_leds("middlering", 0)
+
+
+def test_segments_to_leds_out_of_range_raises():
+    with pytest.raises(IndexError):
+        workshop.segments_to_leds("outer", 22)
+    with pytest.raises(IndexError):
+        workshop.segments_to_leds("middle", 15)
+    with pytest.raises(IndexError):
+        workshop.segments_to_leds("inner", 11)
+
+
+def test_segments_total_coverage_is_196():
+    total = 0
+    for ring, count in [("outer", 22), ("middle", 15), ("inner", 11)]:
+        for i in range(count):
+            total += len(workshop.segments_to_leds(ring, i))
+    assert total == 196

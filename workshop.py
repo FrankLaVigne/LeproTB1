@@ -104,6 +104,42 @@ def _sanitize_name(name: str) -> str:
 
 _DEFAULT_FRAME_DURATION_MS = 2500
 
+# Segment → LED-range mapping for the DIY canvas's 48-mode display.
+# Outer ring: 22 segments × 4 LEDs each = 88 LEDs.
+# Middle ring: 13 segments × 4 LEDs + 2 segments × 5 LEDs = 62 LEDs.
+# Inner ring:  9 segments × 4 LEDs + 2 segments × 5 LEDs = 46 LEDs.
+# 5-LED segments are placed at the end of variable-count rings.
+_OUTER_SEGMENTS = [(i * 4, i * 4 + 4) for i in range(22)]
+_MIDDLE_SEGMENTS = (
+    [(88 + i * 4, 88 + i * 4 + 4) for i in range(13)]
+    + [(140, 145), (145, 150)]
+)
+_INNER_SEGMENTS = (
+    [(150 + i * 4, 150 + i * 4 + 4) for i in range(9)]
+    + [(186, 191), (191, 196)]
+)
+_RING_SEGMENTS = {
+    "outer": _OUTER_SEGMENTS,
+    "middle": _MIDDLE_SEGMENTS,
+    "inner": _INNER_SEGMENTS,
+}
+
+
+def segments_to_leds(ring: str, segment_idx: int) -> range:
+    """Return the range of LED indices for a given (ring, segment) pair.
+
+    Used by the DIY canvas in 48-mode to translate a clicked arc into the
+    underlying LED indices to paint. Raises ValueError for unknown ring names
+    and IndexError for out-of-range segment indices.
+    """
+    if ring not in _RING_SEGMENTS:
+        raise ValueError(f"unknown ring {ring!r}; expected 'outer', 'middle', or 'inner'")
+    segments = _RING_SEGMENTS[ring]
+    if not 0 <= segment_idx < len(segments):
+        raise IndexError(f"{ring} segment index {segment_idx} out of range (0..{len(segments) - 1})")
+    start, stop = segments[segment_idx]
+    return range(start, stop)
+
 
 async def _run_preview(preset: dict, did: str, client) -> None:
     """Cycle the preset's frames on the lamp until cancelled.
