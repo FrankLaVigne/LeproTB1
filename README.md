@@ -157,7 +157,10 @@ direction as a solid color (green ↑, red ↓, yellow on fetch failure, white
 baseline, off if no symbol), and every tick triggers a 5-second whole-lamp
 breathe flash in the new color. Stop powers the lamp off. While the ticker is
 running, the DIY paint endpoint and the workshop preview endpoint return HTTP
-409 — power, brightness, and saves stay available.
+409 — power, brightness, and saves stay available. When any ring is in a
+sustained directional move (3 consecutive same-direction ticks totalling ≥
+0.5%), it earns a **⚡ FAST** badge in the page and the whole lamp switches from
+Steady to Breathe (per-ring colors still visible) until the streak ends.
 
 ## Protocol notes
 
