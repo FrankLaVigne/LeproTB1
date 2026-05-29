@@ -180,6 +180,64 @@ async def api_preset(req):
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
 
+async def api_preview(req):
+    global _preview_task
+    try:
+        body = await req.json()
+        base_name = body["base_name"]
+        color_map = body.get("color_map") or {}
+        preset = _load_preset(base_name)
+        recolored = apply_color_map(preset, color_map)
+        did = _client._dev(None).did
+        # Cancel any in-progress preview before starting the new one.
+        if _preview_task and not _preview_task.done():
+            _preview_task.cancel()
+            try:
+                await _preview_task
+            except asyncio.CancelledError:
+                pass
+        _preview_task = asyncio.create_task(_run_preview(recolored, did, _client))
+        return web.json_response({"ok": True})
+    except (LeproError, ValueError, KeyError, FileNotFoundError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+async def api_stop(_req):
+    global _preview_task
+    if _preview_task and not _preview_task.done():
+        _preview_task.cancel()
+        try:
+            await _preview_task
+        except asyncio.CancelledError:
+            pass
+    _preview_task = None
+    return web.json_response({"ok": True})
+
+
+async def api_save(req):
+    try:
+        body = await req.json()
+        new_name = _sanitize_name(body["new_name"])
+        base_name = body["base_name"]
+        color_map = body.get("color_map") or {}
+        path = _PRESETS_DIR / f"{new_name}.json"
+        if path.exists():
+            return web.json_response(
+                {"ok": False,
+                 "error": f"preset {new_name!r} already exists; pick a unique name"},
+                status=400)
+        base = _load_preset(base_name)
+        recolored = apply_color_map(base, color_map)
+        recolored["name"] = new_name
+        recolored["prompt"] = f"{base_name} recolored via workshop"
+        from datetime import date
+        recolored["captured"] = date.today().isoformat()
+        path.write_text(json.dumps(recolored, indent=2) + "\n")
+        return web.json_response({"ok": True, "path": str(path.relative_to(_HERE))})
+    except (ValueError, KeyError, FileNotFoundError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
 # Tiny placeholder page so smoke tests don't 500. Real UI inlined in Task 7.
 _PAGE = "<!doctype html><title>workshop</title><body>workshop loading...</body>"
 
@@ -219,6 +277,9 @@ def build_app() -> web.Application:
         web.get("/", index),
         web.get("/api/presets", api_presets),
         web.get(r"/api/presets/{name}", api_preset),
+        web.post("/api/preview", api_preview),
+        web.post("/api/stop", api_stop),
+        web.post("/api/save", api_save),
     ])
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
