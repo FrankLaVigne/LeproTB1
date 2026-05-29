@@ -212,3 +212,96 @@ def test_ticker_session_snapshot_isolated_from_session_state():
     fresh = sess.snapshot()
     assert fresh["rings"]["outer"]["color"] == "FFFFFF"
     assert fresh["rings"]["outer"]["recent_ticks"] == []
+
+
+# --- TickerSession async tests -----------------------------------------------
+
+
+class _FakeClient:
+    """Captures every send_raw payload for assertions."""
+
+    def __init__(self):
+        self.sent = []
+
+    async def send_raw(self, payload):
+        self.sent.append(payload)
+
+
+async def _coro(value):
+    return value
+
+
+@pytest.mark.asyncio
+async def test_session_start_then_stop_marks_running_and_clears():
+    client = _FakeClient()
+    sess = ticker.TickerSession(client=client,
+                                 symbols={"outer": "AAPL"},
+                                 interval=10)
+    sess.set_baseline("outer", 100.0)
+    # Patch fetch to a deterministic source.
+    fetched = [101.0, 102.0]
+    async def _fake_one_poll():
+        return {"outer": fetched.pop(0) if fetched else 102.0}
+    sess._fetch_all = _fake_one_poll  # type: ignore[assignment]
+
+    await sess.start()
+    assert sess.running is True
+    # Give the loop one tick (interval=10 means it sleeps; we don't wait
+    # for the sleep — we cancel right away to confirm the start/stop wiring).
+    await sess.stop()
+    assert sess.running is False
+    snap = sess.snapshot()
+    assert snap["running"] is False
+
+
+@pytest.mark.asyncio
+async def test_session_one_poll_sends_payload_and_records_history():
+    client = _FakeClient()
+    sess = ticker.TickerSession(client=client,
+                                 symbols={"middle": "IBM"},
+                                 interval=10)
+    sess.set_baseline("middle", 138.25)
+
+    async def _one_poll():
+        # IBM ticked up.
+        return {"middle": 139.10}
+    sess._fetch_all = _one_poll  # type: ignore[assignment]
+
+    # Drive a single iteration without waiting on asyncio.sleep.
+    await sess._tick_once()
+
+    snap = sess.snapshot()
+    assert snap["rings"]["middle"]["color"] == "00FF00"
+    assert snap["rings"]["middle"]["current_price"] == 139.10
+    assert snap["rings"]["middle"]["recent_ticks"][0]["price"] == 139.10
+    # Lamp received exactly one payload (the Breathe flash because the color changed).
+    assert len(client.sent) == 1
+    assert client.sent[0]["d1"] == 1
+    assert client.sent[0]["d2"] == 2
+    # The first payload after a tick is the single-color Breathe flash.
+    assert "E4" in client.sent[0]["d50"]  # Breathe effect tail marker
+
+
+@pytest.mark.asyncio
+async def test_session_steady_payload_when_no_flash_active():
+    client = _FakeClient()
+    sess = ticker.TickerSession(client=client,
+                                 symbols={"outer": "AAPL"},
+                                 interval=10)
+    sess.set_baseline("outer", 100.0)
+
+    # First poll: uptick triggers flash.
+    sess._fetch_all = lambda: _coro({"outer": 110.0})
+    await sess._tick_once()
+    flash_payload = client.sent[-1]
+
+    # Force the flash window to expire.
+    sess._flash_until = None
+    # Second poll: same price (flat) — no tick, Steady tail.
+    sess._fetch_all = lambda: _coro({"outer": 110.0})
+    await sess._tick_once()
+    steady_payload = client.sent[-1]
+
+    assert "E4" in flash_payload["d50"]      # Breathe
+    # Steady tail ends in "E1;" (where ; is the d50 terminator).
+    assert steady_payload["d50"].endswith("E1;")

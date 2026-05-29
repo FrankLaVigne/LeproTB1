@@ -156,3 +156,102 @@ class TickerSession:
             "flash_until": self._flash_until,
             "rings": {k: copy.deepcopy(v) for k, v in self._rings.items()},
         }
+
+    async def _fetch_all(self):
+        """Fetch the latest price for every configured ring, in parallel."""
+        import asyncio
+        active = [(ring, r["symbol"]) for ring, r in self._rings.items() if r is not None]
+        results = await asyncio.gather(
+            *[asyncio.to_thread(fetch_price, sym) for _, sym in active]
+        )
+        return {ring: price for (ring, _), price in zip(active, results)}
+
+    async def _tick_once(self):
+        """Run one poll iteration: fetch -> decide -> compose -> send."""
+        results = await self._fetch_all()
+        flash_color = None
+        for ring in self._VALID_RINGS:
+            if ring not in results:
+                continue
+            r = self._rings[ring]
+            now = results[ring]
+            new_color, ticked = decide_ring_color(r["prev_price"], now, r["color"])
+            r["color"] = new_color
+            r["current_price"] = now
+            r["last_fetch_at"] = datetime.now().isoformat(timespec="seconds")
+            r["last_fetch_ok"] = now is not None
+            if now is not None:
+                r["prev_price"] = now
+            if ticked:
+                direction = (
+                    "baseline" if new_color == COLOR_WHITE
+                    else "up" if new_color == COLOR_GREEN
+                    else "down" if new_color == COLOR_RED
+                    else "error"
+                )
+                self.record_tick(ring, now if now is not None else 0.0, direction)
+                flash_color = new_color  # outer->middle->inner; last writer wins
+                r["ticked_at"] = datetime.now().isoformat(timespec="seconds")
+
+        if flash_color is not None:
+            from datetime import timedelta
+            self._flash_until = (datetime.now() + timedelta(seconds=5)).isoformat(timespec="seconds")
+
+        # Decide which d50 to send: flash if we're still inside the window.
+        flashing = self._is_flashing()
+        send_flash = flash_color if flashing else None
+        d50 = build_ticker_d50(self._snapshot_rings_for_d50(), send_flash)
+
+        try:
+            await self._client.send_raw({"d1": 1, "d2": 2, "d50": d50})
+        except Exception:  # noqa: BLE001 — log and continue (matches stock_lamp.py)
+            pass
+
+    def _snapshot_rings_for_d50(self):
+        """build_ticker_d50 expects every ring slot present; substitute black."""
+        return {
+            ring: (self._rings[ring] if self._rings[ring] is not None
+                   else {"color": COLOR_OFF})
+            for ring in self._VALID_RINGS
+        }
+
+    def _is_flashing(self):
+        if self._flash_until is None:
+            return False
+        return datetime.fromisoformat(self._flash_until) > datetime.now()
+
+    async def start(self):
+        """Spawn the background polling loop."""
+        import asyncio
+        if self.running:
+            return
+        self._since = datetime.now().isoformat(timespec="seconds")
+        loop = asyncio.get_running_loop()
+        self._task = loop.create_task(self._run())
+
+    async def _run(self):
+        """The loop body — driven by start(), cancellable by stop()."""
+        import asyncio
+        try:
+            while True:
+                await self._tick_once()
+                await asyncio.sleep(self._interval)
+        except asyncio.CancelledError:
+            pass
+
+    async def stop(self):
+        """Cancel the polling loop and power the lamp off."""
+        import asyncio
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+            self._task = None
+        try:
+            await self._client.send_raw({"d1": 0})
+        except Exception:  # noqa: BLE001
+            pass
+        self._since = None
+        self._flash_until = None
