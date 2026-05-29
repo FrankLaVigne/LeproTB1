@@ -107,3 +107,31 @@ def test_build_ticker_d50_all_three_rings_same_color_compresses_to_one_group():
     rings = _rings(outer="00FF00", middle="00FF00", inner="00FF00")
     d50 = ticker.build_ticker_d50(rings, flash_color=None)
     assert d50 == "N01:P1000100FF00F21000100C4U3V3000640000E1;"
+
+
+# --- fetch_price tests --------------------------------------------------------
+
+
+def test_fetch_price_unknown_symbol_returns_None(monkeypatch):
+    # Patch yfinance.Ticker to raise.
+    class _Boom:
+        def __init__(self, symbol):
+            raise RuntimeError("simulated network error")
+    monkeypatch.setattr("yfinance.Ticker", _Boom)
+    assert ticker.fetch_price("NOPE") is None
+
+
+def test_fetch_price_returns_last_price_as_float(monkeypatch):
+    class _Fake:
+        def __init__(self, symbol):
+            self.fast_info = {"last_price": 176.42}
+    monkeypatch.setattr("yfinance.Ticker", _Fake)
+    assert ticker.fetch_price("AAPL") == 176.42
+
+
+def test_fetch_price_returns_None_when_last_price_missing(monkeypatch):
+    class _Fake:
+        def __init__(self, symbol):
+            self.fast_info = {"last_price": None}
+    monkeypatch.setattr("yfinance.Ticker", _Fake)
+    assert ticker.fetch_price("AAPL") is None

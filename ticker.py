@@ -63,3 +63,18 @@ def build_ticker_d50(rings, flash_color):
     inner = rings["inner"]["color"]
     leds = [outer] * 88 + [middle] * 62 + [inner] * 46
     return build_d50_from_leds(leds, "Steady", 50)
+
+
+def fetch_price(symbol):
+    """Return latest known price for ``symbol``, or None on any error.
+
+    Synchronous; the polling loop wraps it in ``asyncio.to_thread``. Matches
+    the shape used by ``stock_lamp.fetch_price`` so the two stay drop-in
+    compatible.
+    """
+    try:
+        import yfinance as yf  # local import — keeps workshop import time fast
+        price = yf.Ticker(symbol).fast_info["last_price"]
+        return float(price) if price is not None else None
+    except Exception:  # noqa: BLE001  — any yfinance / network error -> None
+        return None
