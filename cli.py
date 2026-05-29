@@ -74,9 +74,11 @@ async def main() -> int:
             print(f"Listening {args.seconds}s on le/{did}/prp/# — trigger effects in the app now…")
 
             async def on_update(d, fields):
-                interesting = {k: fields[k] for k in ("d2", "d50", "d60", "d5") if k in fields}
-                if interesting:
-                    print(f"[{d}] {interesting}")
+                # Show every field the lamp reports. Earlier versions filtered to
+                # d2/d50/d60/d5 and silently hid brightness (d52) for months —
+                # never again.
+                if fields:
+                    print(f"[{d}] {fields}")
 
             try:
                 await asyncio.wait_for(client.listen(on_update=on_update), timeout=args.seconds)

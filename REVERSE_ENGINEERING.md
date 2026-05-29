@@ -340,16 +340,30 @@ Phase-by-phase mapping for the worked example:
 
 ### The TB1 `d` field reference (what we've decoded)
 
-| Field | Meaning |
-|-------|---------|
-| `d1`  | power — `1` on, `0` off |
-| `d2`  | mode — `0` white/CCT, `1` RGB, `2` segments/effect, `3` special effect |
-| `d3`  | brightness 0–1000 (white & B-series RGB modes) |
-| `d4`  | white temperature 0–1000 (0 = 2700 K warm, 1000 = 6500 K cool) |
-| `d5`  | RGB as HSV hex `HHHHSSSSVVVV` (hue 0–360, sat/val 0–1000) |
-| `d52` | brightness 0–1000 (segmented/strip mode) |
-| `d50` | the rich animation language (see below) |
-| `d60` | special-effect + sensitivity string |
+| Field | Meaning | Status |
+|-------|---------|--------|
+| `d1`  | power — `1` on, `0` off | ✅ confirmed |
+| `d2`  | mode — `0` white/CCT, `1` RGB, `2` segments/effect, `3` special effect | ✅ confirmed |
+| `d3`  | brightness 0–1000 (white & B-series RGB modes — **NOT** the TB1's segmented mode) | ✅ confirmed |
+| `d4`  | white temperature 0–1000 (0 = 2700 K warm, 1000 = 6500 K cool) | ✅ confirmed |
+| `d5`  | RGB as HSV hex `HHHHSSSSVVVV` (hue 0–360, sat/val 0–1000) | ✅ confirmed |
+| `d50` | the rich animation language (see below) | ✅ confirmed |
+| `d52` | brightness 0–1000 (segmented/strip mode) — **layers cleanly on top of any `d50` pattern** | ✅ confirmed end-to-end (2026-05-29) |
+| `d60` | special-effect + sensitivity string | ✅ partial |
+| `d30` | session/instance id (hex) — observed but role unclear | ⚠️ unknown |
+
+**Brightness for the TB1 specifically:** the lamp lives in `d2=2` (segmented)
+mode for any custom pattern or captured preset, so the relevant brightness
+field is **`d52`** (not `d3`). They're independent — `d52` can be sent on its
+own to fade a running pattern without re-publishing `d50`. Confirmed by
+sending `{"d52": 250}` then `{"d52": 750}` from code and observing dim → bright.
+
+> ⚠️ **Methodology lesson** (the kind that costs hours): make your capture
+> tool show *every* field by default, not a filtered subset. Our `cli.py
+> capture` was silently dropping `d3`/`d4`/`d52`/`d30` because we picked a
+> small "interesting" set early on. We didn't realize brightness lived in
+> `d52` for *weeks* because we never saw it. **If the tool can hide
+> information from you, sooner or later it will.**
 
 ### The d50 format — what we know, what we don't
 

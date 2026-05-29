@@ -262,6 +262,96 @@ end-to-end**:
 > positions across the whole lamp, matching the app's resolution. Clock is
 > still buildable, just chunkier.
 
+### Brightness lives in `d52` (segmented mode) — experimentally confirmed (2026-05-29)
+
+While testing whether the DIY app's brightness slider modifies the `d50`, we
+discovered our `cli.py capture` was silently filtering out everything except
+`d2/d50/d60/d5`. A full unfiltered capture during a brightness experiment
+revealed:
+
+```
+d1:  1     (power on)
+d2:  2     (segmented/effect mode)
+d3:  1000  (B-series brightness — irrelevant when d2=2, always at max)
+d4:  79    (white temp — stale from previous CCT mode)
+d5:  "..."  (HSV — stale; not used in segmented mode)
+d50: <unchanged across the entire brightness experiment>
+d52: 230   ← ★ this is the segmented-mode brightness; user had slider at 23%
+d60: "20700004E0000"
+d30: "11A6CE21"  (looks like a session/instance ID; unchanged across captures)
+```
+
+> **`d52`** is the brightness field for segmented mode (`d2=2`). Range 0–1000
+> mapped to 0–100% on the slider. **Brightness does not affect `d50`** — the
+> pattern string is identical regardless of brightness level.
+
+End-to-end confirmation: sending `{"d52": 250}` then `{"d52": 750}` from our
+code (one second apart) produced a visible dim-then-brighten on the lamp.
+Brightness can be sequenced from code with sub-second precision, independent
+of any `d50` pattern.
+
+**Implications for design:**
+- Brightness control is fully orthogonal to pattern generation. Any `d50`
+  pattern + any `d52` value composes cleanly.
+- The clock can have a "fade brightness by time of day" feature trivially.
+- Our existing `set_brightness()` writes `d3` for B-series devices (the TB1
+  matches this heuristic), which is *wrong* for the TB1 in segmented mode.
+  When the TB1 is in `d2=2` mode (as it is for any captured preset or any
+  ring-pattern we generate), `set_brightness()` should write `d52` not `d3`.
+  Worth a small fix.
+
+### The DIY screen's 6 built-in effects (catalog confirmed 2026-05-29)
+
+The Lepro DIY screen exposes exactly six animation modes (per user screenshot):
+
+| Button | Tail format (from reference + captures) | Capture status on TB1 |
+|---|---|---|
+| **Steady** | `000640000E1` | ✅ baseline of every solid capture |
+| **Breathe** | `000640000E4{sp}0000{sp}1664` | ✅ replays via existing `set_effect("breath")` |
+| **Gradient** | `100640000E3{sp}C2O6{sp}` | ✅ captured live during 2026-05-29 brightness session |
+| **Leftward** | `00264{sp}E1` (per reference) | ⚠️ untested on TB1 since fixing the ring-length bug |
+| **Rightward** | `00164{sp}E1` (per reference) | ⚠️ captured tail matches `00164{sp}E1` shape during 2026-05-29 — needs a deliberate isolated re-capture to confirm Rightward vs Circle |
+| **Circle** | `100640000E1C2O6{sp}` (per reference) | ⚠️ untested on TB1 since fixing the ring-length bug |
+
+Reading the captures alongside the screenshot: `{sp}` is a 4-hex-char speed
+value (0x7E ≈ 50% slider, 0x0FA0 ≈ slowest, 0x0001 ≈ fastest — confirmed from
+reference's `_speed_to_hex` log scale).
+
+**Crucially:** all six effects are emitted by the same `N01:P1000{N}{colors}
+F21000{G}{lengths}U3V3<tail>;` envelope. Only the trailing tail changes. So we
+can:
+
+1. Pick any palette (any colors)
+2. Pick any per-ring/per-segment grouping
+3. Pick any of the 6 motion modes
+4. Set any speed
+5. Set any brightness via the orthogonal `d52` field
+
+All composable. Locked in.
+
+### Side-finding from the same captures: TB1 actually honors the strip-protocol effect tails
+
+During the brightness experiment the user accidentally tapped one of the DIY
+screen's animation buttons (Leftward, Rightward, Gradient, etc.) before
+finding the brightness slider. The captures showed:
+
+```
+…U3V3 100640000E3 007E C2O6 007E   ← gradient tail (from reference integration)
+…U3V3 00164 007E E1                  ← clockwise tail (from reference integration)
+```
+
+These are the **exact tails** we previously tried via `set_effect("circular",
+…)` and got only solid color on the TB1. The palette and group lengths in
+these captures are `88/62/46` (the TB1's actual ring layout), not `0019`
+(the 25-segment strip assumption our `_build_d50` uses).
+
+> **Strong hypothesis (untested):** the rotation effects (`clockwise`,
+> `counterclockwise`, `circular`, `gradient`, `leftward`, `rightward`) DO
+> animate on the TB1. Our earlier "solid color, no motion" result was almost
+> certainly because we sent them with `F2100010019` (25 LEDs total) instead
+> of `F2100030058003E002E` (88+62+46 = 196). Fixing `_build_d50` to use the
+> ring-aligned lengths should unlock all of them.
+
 ### The full generator format (confirmed)
 
 For static patterns on the whole lamp:
