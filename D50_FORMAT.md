@@ -247,20 +247,16 @@ The non-integer averages mean some app segments cover 4 LEDs and others 5
 one LED at position `X` — but this **has not yet been empirically confirmed
 end-to-end**:
 
-> **Open hypothesis (high confidence, untested):** the `F21000{G}{lengths}`
-> encoding accepts `length=1` groups, giving us per-LED addressability *via
-> the protocol* even though the *app* exposes only 4-LED-quantized segments.
+> **Per-LED addressability — EXPERIMENTALLY CONFIRMED (2026-05-29):** sent a
+> sweep of 196 d50 payloads from our code (`length=1` red group at positions
+> 0 through 195, all other LEDs white). The final state showed exactly **one**
+> red LED on the inner ring at position 195 — no quantization, no rounding,
+> exactly one LED. The firmware honors arbitrary `length=1` groups at any
+> position in the 0–195 LED address space.
 >
-> To confirm: send a synthetic payload from our code (via `cli.py raw`) with a
-> single-LED group somewhere mid-ring and observe whether the lamp lights
-> exactly one LED, or rounds to the nearest 4-LED segment boundary.
->
-> Outcome A (per-LED works): we have ~88 outer-ring positions for a clock
-> hand, plus full per-LED creative control.
->
-> Outcome B (firmware quantizes to 4-LED segments): we're limited to ~48
-> positions across the whole lamp, matching the app's resolution. Clock is
-> still buildable, just chunkier.
+> Implication: full 196-position resolution is available to us via the
+> protocol, even though the Lepro app's DIY UI exposes only 48 paintable
+> segments at ~4 LEDs each.
 
 ### Brightness lives in `d52` (segmented mode) — experimentally confirmed (2026-05-29)
 
