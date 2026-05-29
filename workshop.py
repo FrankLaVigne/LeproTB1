@@ -269,6 +269,14 @@ async def index_diy(_req):
     return web.Response(text=_PAGE_DIY, content_type="text/html")
 
 
+async def index_ticker(_req):
+    return web.Response(text=_PAGE_TICKER, content_type="text/html")
+
+
+# Real ticker UI inlined in Task 8.
+_PAGE_TICKER = "<!doctype html><title>ticker</title><body>ticker loading...</body>"
+
+
 # Real DIY UI inlined in Task 6.
 _PAGE_DIY = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -1123,6 +1131,7 @@ def build_app() -> web.Application:
     app.add_routes([
         web.get("/", index),
         web.get("/diy", index_diy),
+        web.get("/ticker", index_ticker),
         web.get("/api/presets", api_presets),
         web.get(r"/api/presets/{name}", api_preset),
         web.post("/api/power", api_power),
