@@ -121,6 +121,26 @@ In short: pulse means "something is moving"; solid green/red means "calm";
 yellow means "I can't see the price right now"; the color tells you the
 most recent direction (or the failure state).
 
+## Preset workshop
+
+A web UI for browsing the captured preset library, recoloring a chosen preset
+via a color-combo picker, naming the variant, previewing it on the lamp, and
+saving the result as a new `presets/*.json`.
+
+```bash
+.venv/bin/python workshop.py        # serves on 0.0.0.0:8081
+```
+
+Open `http://<vm-ip>:8081` in a browser. Left column lists every preset with a
+palette preview; click one to load it as the base. Right column has a Variant
+name input, a Color Combo (N round swatches matching the base's distinct
+palette colors — click each to pick a new hex), and disabled Speed / Brightness
+sliders (decode pending — see `D50_FORMAT.md`). Preview pushes the recolored
+animation to the lamp live; Save writes a new file under `presets/`.
+
+LAN-only — no auth. Override the bind address with `LEPRO_WORKSHOP_HOST` /
+`LEPRO_WORKSHOP_PORT`. Coexists with `app.py` (8080) and the MCP server (8765).
+
 ## Protocol notes
 
 Control commands are an MQTT publish to `le/{deviceId}/prp/set` with payload
