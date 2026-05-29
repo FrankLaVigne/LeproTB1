@@ -320,7 +320,7 @@ def test_build_d50_from_leds_single_LED_lit():
     leds = _all(47, "FFFFFF") + ["FF0000"] + _all(148, "FFFFFF")
     d50 = workshop.build_d50_from_leds(leds, "Steady", 50)
     # The palette has 3 colors (white, red, white) because duplicates ARE allowed
-    # and group K uses palette index K — see D50_FORMAT.md.
+    # and group K uses palette index K — see docs/D50_FORMAT.md.
     assert d50 == "N01:P10003FFFFFFFF0000FFFFFFF210003002F00010094U3V3000640000E1;"
 
 
@@ -350,7 +350,7 @@ def test_build_d50_from_leds_rejects_wrong_length():
 
 # --- apply_lamp_rotation tests ------------------------------------------------
 # Assertions reference workshop's rotation constants so empirical tuning of
-# the calibration values (CALIBRATION.md) doesn't break these tests.
+# the calibration values (docs/CALIBRATION.md) doesn't break these tests.
 
 
 def test_apply_lamp_rotation_outer_page0_uses_outer_rotation_offset():

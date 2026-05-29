@@ -135,7 +135,7 @@ Open `http://<vm-ip>:8081` in a browser. Left column lists every preset with a
 palette preview; click one to load it as the base. Right column has a Variant
 name input, a Color Combo (N round swatches matching the base's distinct
 palette colors — click each to pick a new hex), and disabled Speed / Brightness
-sliders (decode pending — see `D50_FORMAT.md`). Preview pushes the recolored
+sliders (decode pending — see `docs/D50_FORMAT.md`). Preview pushes the recolored
 animation to the lamp live; Save writes a new file under `presets/`.
 
 LAN-only — no auth. Override the bind address with `LEPRO_WORKSHOP_HOST` /
@@ -191,8 +191,21 @@ reports, then use `cli.py raw '{...}'` to experiment and refine.
 - `lepro.py` — async cloud client (`LeproClient`): login, discovery, MQTT, commands.
 - `cli.py` — command-line interface.
 - `app.py` — aiohttp web front end.
+- `workshop.py` — preset workshop / DIY editor / stock ticker / state viewer at `:8081`.
+- `ticker.py` — stock-ticker session module used by `workshop.py`.
+- `stock_lamp.py` — standalone CLI version of the stock ticker.
+- `mcp_server.py` — networked FastMCP server with 12 lamp tools.
 - `client_key.pem` — the static MQTT client private key shipped publicly with the
   app (per-account certs are downloaded at login into `certs/`).
+
+## Documentation (`docs/`)
+
+- [`D50_FORMAT.md`](docs/D50_FORMAT.md) — the fully decoded per-LED `d50` protocol.
+- [`REVERSE_ENGINEERING.md`](docs/REVERSE_ENGINEERING.md) — methodology playbook.
+- [`CALIBRATION.md`](docs/CALIBRATION.md) — page→physical ring rotation offsets.
+- [`article.md`](docs/article.md) — blog draft on the project's decoding journey.
+- [`reverse-engineering-just-got-cheap.md`](docs/reverse-engineering-just-got-cheap.md) — companion essay on AI-assisted RE.
+- [`superpowers/`](docs/superpowers/) — specs and implementation plans per feature.
 
 ## Disclaimer
 

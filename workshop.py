@@ -20,10 +20,10 @@ from aiohttp import web
 from lepro import LeproClient, LeproError, load_config
 
 # Match P1000<count><colors>. Count is a single decimal digit (1-9 verified;
-# REVERSE_ENGINEERING.md caps at 9). Colors are distinct 6-hex RGB tuples.
+# docs/REVERSE_ENGINEERING.md caps at 9). Colors are distinct 6-hex RGB tuples.
 _P1000_RE = re.compile(r"P1000(\d)((?:[0-9A-Fa-f]{6})+)")
 
-# Match P4000<count><hex>. D50_FORMAT.md: "fixed-pattern shortcut where the
+# Match P4000<count><hex>. docs/D50_FORMAT.md: "fixed-pattern shortcut where the
 # palette is one color used N times." One 6-hex color repeated count times.
 _P4000_RE = re.compile(r"P4000(\d)((?:[0-9A-Fa-f]{6})+)")
 
@@ -126,7 +126,7 @@ _RING_SEGMENTS = {
 }
 
 
-# Page-to-physical rotation (see CALIBRATION.md). The DIY canvas draws each
+# Page-to-physical rotation (see docs/CALIBRATION.md). The DIY canvas draws each
 # ring's segment 0 at 12 o'clock, but the LED strip enters each ring at a
 # different physical angle (outer/middle ~8 o'clock, inner ~11 o'clock).
 # Applied at the page↔protocol boundary in api_diy_paint and api_diy_save.
@@ -216,7 +216,7 @@ def build_d50_from_leds(leds: list[str | None], effect: str, speed: int) -> str:
 
     None values are treated as the color "000000" (off). Duplicate palette
     entries are emitted as-is (verified to work by experiment 2026-05-29 —
-    see D50_FORMAT.md). The output is uppercase normalized to match what the
+    see docs/D50_FORMAT.md). The output is uppercase normalized to match what the
     Lepro app emits.
     """
     if len(leds) != 196:
@@ -581,6 +581,18 @@ _PAGE_STATE = """<!doctype html>
   #polled { font-size: 12px; color: #777; margin-top: 8px; }
   .empty { color: #777; font-style: italic; padding: 20px;
            text-align: center; }
+  .viz-head { display: flex; align-items: center;
+              justify-content: space-between; margin-bottom: 8px; }
+  .res { display: flex; gap: 2px; background: #2a2a30;
+         padding: 2px; border-radius: 8px; }
+  .res button { padding: 6px 10px; background: transparent;
+                border-radius: 6px; border: 0; color: #eee;
+                cursor: pointer; font: inherit; font-size: 12px; }
+  .res button.active { background: #5fd9d9; color: #111; font-weight: 700; }
+  .lamp-canvas { display: flex; justify-content: center; padding: 6px 0; }
+  svg .seg { transition: opacity .2s; }
+  .viz-note { font-size: 11px; color: #777; margin-top: 6px;
+              text-align: center; }
 </style></head>
 <body><div class="wrap">
   <div class="header">
@@ -590,6 +602,20 @@ _PAGE_STATE = """<!doctype html>
       <a href="/ticker">&#x1F4C8; Ticker</a>
       <a href="/state" class="active">&#x1F4CA; State</a>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="viz-head">
+      <h2>Visualizer</h2>
+      <div class="res" id="res-toggle">
+        <button data-res="48" class="active">48</button>
+        <button data-res="196">196</button>
+      </div>
+    </div>
+    <div class="lamp-canvas">
+      <svg id="lamp" width="380" height="380" viewBox="-200 -200 400 400"></svg>
+    </div>
+    <div class="viz-note" id="viz-note">waiting for d50…</div>
   </div>
 
   <div class="card">
@@ -616,8 +642,152 @@ _PAGE_STATE = """<!doctype html>
 
 <script type="module">
 const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+// --- visualizer: mirrors DIY canvas, read-only -------------------------------
+// Rotation constants MUST mirror workshop.py's _OUTER/_MIDDLE/_INNER_ROTATION.
+// Apply the inverse: page[i] = physical[(i + offset) % ring_size].
+const OUTER_ROT = 31;
+const MIDDLE_ROT = 22;
+const INNER_ROT = 4;
+
+const OUTER = Array.from({length:22}, (_,i) => [i*4, i*4+4]);
+const MIDDLE = [
+  ...Array.from({length:13}, (_,i) => [88+i*4, 88+i*4+4]),
+  [140,145], [145,150],
+];
+const INNER = [
+  ...Array.from({length:9}, (_,i) => [150+i*4, 150+i*4+4]),
+  [186,191], [191,196],
+];
+const RING_GEOMETRY = {
+  outer:  {r0: 130, r1: 180},
+  middle: {r0: 90,  r1: 125},
+  inner:  {r0: 50,  r1: 85},
+};
+
+let vizRes = 48;
+
+function parseD50_N01(d50) {
+  // Parse our N01 format. Returns 196-entry array in physical-space, or null
+  // if the format is not the simple per-LED Steady/effect d50 we generate.
+  if (!d50 || typeof d50 !== 'string') return null;
+  const m = d50.match(/^N01:P1000([0-9]+)([0-9A-Fa-f]+)F21000([0-9]+)([0-9A-Fa-f]+)U3V3/);
+  if (!m) return null;
+  const N = parseInt(m[1], 10);
+  const colors = m[2];
+  if (colors.length < N * 6) return null;
+  const G = parseInt(m[3], 10);
+  const lengthsHex = m[4];
+  if (lengthsHex.length < G * 4) return null;
+  const palette = [];
+  for (let i = 0; i < N; i++) palette.push(colors.slice(i*6, i*6+6).toUpperCase());
+  const physical = [];
+  for (let g = 0; g < G; g++) {
+    const len = parseInt(lengthsHex.slice(g*4, g*4+4), 16);
+    const color = palette[g % N];
+    for (let j = 0; j < len; j++) physical.push(color);
+  }
+  if (physical.length !== 196) return null;
+  return physical;
+}
+
+function unrotateToPage(physical) {
+  const page = new Array(196).fill('000000');
+  for (let i = 0; i < 88; i++) page[i] = physical[(i + OUTER_ROT) % 88];
+  for (let k = 0; k < 62; k++) page[88 + k] = physical[88 + (k + MIDDLE_ROT) % 62];
+  for (let k = 0; k < 46; k++) page[150 + k] = physical[150 + (k + INNER_ROT) % 46];
+  return page;
+}
+
+function arcPath(r0, r1, a0, a1) {
+  const toXY = (r, a) => [r*Math.cos(a), r*Math.sin(a)];
+  const [x0a, y0a] = toXY(r0, a0);
+  const [x1a, y1a] = toXY(r1, a0);
+  const [x1b, y1b] = toXY(r1, a1);
+  const [x0b, y0b] = toXY(r0, a1);
+  const large = (a1 - a0) > Math.PI ? 1 : 0;
+  return `M${x0a},${y0a} L${x1a},${y1a} A${r1},${r1} 0 ${large} 1 ${x1b},${y1b}`
+       + ` L${x0b},${y0b} A${r0},${r0} 0 ${large} 0 ${x0a},${y0a} Z`;
+}
+
+function segments196(ring) {
+  const start = ring === 'outer' ? 0 : ring === 'middle' ? 88 : 150;
+  const stop  = ring === 'outer' ? 88 : ring === 'middle' ? 150 : 196;
+  return Array.from({length: stop - start}, (_, i) => [start + i, start + i + 1]);
+}
+
+function drawViz(pageLeds) {
+  const svg = $('#lamp');
+  svg.innerHTML = '';
+  const rings = vizRes === 48
+    ? [['outer', OUTER], ['middle', MIDDLE], ['inner', INNER]]
+    : [['outer', segments196('outer')],
+       ['middle', segments196('middle')],
+       ['inner', segments196('inner')]];
+  for (const [name, segs] of rings) {
+    const g = RING_GEOMETRY[name];
+    const total = segs.length;
+    for (let i = 0; i < total; i++) {
+      const [start, _stop] = segs[i];
+      const a0 = (i / total) * 2 * Math.PI - Math.PI / 2;
+      const a1 = ((i + 1) / total) * 2 * Math.PI - Math.PI / 2;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', arcPath(g.r0, g.r1, a0, a1));
+      const color = pageLeds ? pageLeds[start] : null;
+      path.setAttribute('fill', color && color !== '000000' ? '#' + color : '#000');
+      path.setAttribute('stroke', '#1c1c1f');
+      path.setAttribute('stroke-width', '1');
+      path.classList.add('seg');
+      svg.appendChild(path);
+    }
+  }
+}
+
+function drawEmpty() {
+  vizRes; // keep current toggle state
+  drawViz(null);
+}
+
+for (const b of $$('#res-toggle button')) {
+  b.onclick = () => {
+    vizRes = parseInt(b.dataset.res, 10);
+    for (const x of $$('#res-toggle button')) {
+      x.classList.toggle('active', parseInt(x.dataset.res, 10) === vizRes);
+    }
+    refresh();  // re-render at new resolution with the latest state
+  };
+}
+
+function renderViz(data) {
+  const note = $('#viz-note');
+  const dids = Object.keys(data.devices || {});
+  if (!dids.length) {
+    drawEmpty();
+    note.textContent = 'waiting for d50…';
+    return;
+  }
+  // Pick the first device (there's almost always one).
+  const fields = data.devices[dids[0]] || {};
+  const d50 = fields.d50;
+  if (!d50) {
+    drawEmpty();
+    note.textContent = 'no d50 in current state (try a paint or preset)';
+    return;
+  }
+  const physical = parseD50_N01(d50);
+  if (!physical) {
+    drawEmpty();
+    note.textContent = 'd50 format not N01 (likely a multi-program preset — visualizer only knows the simple form)';
+    return;
+  }
+  const page = unrotateToPage(physical);
+  drawViz(page);
+  note.textContent = '';
+}
 
 function renderState(data) {
+  renderViz(data);
   const content = $('#content');
   const polled = $('#polled');
   polled.textContent = data.polled_at ? 'polled at ' + data.polled_at : '';
@@ -664,6 +834,7 @@ async function refresh() {
   }
 }
 
+drawEmpty();
 refresh();
 setInterval(refresh, 2000);
 </script></body></html>"""
