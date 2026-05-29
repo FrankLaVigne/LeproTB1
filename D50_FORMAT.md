@@ -304,14 +304,31 @@ of any `d50` pattern.
 
 The Lepro DIY screen exposes exactly six animation modes (per user screenshot):
 
-| Button | Tail format (from reference + captures) | Capture status on TB1 |
+| Button | Tail format | Capture status on TB1 |
 |---|---|---|
-| **Steady** | `000640000E1` | ✅ baseline of every solid capture |
-| **Breathe** | `000640000E4{sp}0000{sp}1664` | ✅ replays via existing `set_effect("breath")` |
-| **Gradient** | `100640000E3{sp}C2O6{sp}` | ✅ captured live during 2026-05-29 brightness session |
-| **Leftward** | `00264{sp}E1` (per reference) | ⚠️ untested on TB1 since fixing the ring-length bug |
-| **Rightward** | `00164{sp}E1` (per reference) | ⚠️ captured tail matches `00164{sp}E1` shape during 2026-05-29 — needs a deliberate isolated re-capture to confirm Rightward vs Circle |
-| **Circle** | `100640000E1C2O6{sp}` (per reference) | ⚠️ untested on TB1 since fixing the ring-length bug |
+| **Steady** | `000640000E1` | ✅ confirmed (baseline of every solid capture) |
+| **Breathe** | `000640000E4{sp}0000{sp}1664` | ✅ confirmed (replays via existing `set_effect("breath")`) |
+| **Gradient** | `100640000E3{sp}C2O6{sp}` | ✅ confirmed (captured 2026-05-29) |
+| **Leftward** | `00164{sp}E1` | ✅ confirmed (captured 2026-05-29 — reference calls this "clockwise") |
+| **Rightward** | `00264{sp}E1` | ✅ confirmed (captured 2026-05-29 — reference calls this "counterclockwise") |
+| **Circle** | `100640000E1C2O6{sp}` | ✅ confirmed (captured 2026-05-29) |
+
+**Naming reconciliation:** The reference HA integration uses "clockwise" /
+"counterclockwise" for the `00164` / `00264` tails. The Lepro app calls these
+"Leftward" / "Rightward" in the DIY screen. We use the Lepro app names going
+forward because they're what the user sees.
+
+**Compositional observation:** the tails appear to have sub-structure rather
+than being opaque codes:
+
+- `000640000E1` (Steady, no motion)
+- `000640000E4...` (Breathe — same prefix, `E1` → `E4` adds pulsing)
+- `100640000E1...` (Circle — same as Steady but with `1` lead and `C2O6{sp}` motion suffix)
+- `100640000E3...` (Gradient — same `1` lead but `E3` and `C2O6{sp}`)
+- `00164{sp}E1` / `00264{sp}E1` (Leftward / Rightward — shorter, simpler family with direction byte `1`/`2`)
+
+Worth fully decoding when we need to encode arbitrary tails ourselves rather
+than just reusing these six.
 
 Reading the captures alongside the screenshot: `{sp}` is a 4-hex-char speed
 value (0x7E ≈ 50% slider, 0x0FA0 ≈ slowest, 0x0001 ≈ fastest — confirmed from
