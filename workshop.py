@@ -6,6 +6,7 @@ Sibling to app.py. Defaults to 0.0.0.0:8081.
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import re
 
@@ -91,3 +92,30 @@ def _sanitize_name(name: str) -> str:
             "([a-z0-9][a-z0-9-]*) — no spaces, uppercase, or path separators"
         )
     return name
+
+
+_DEFAULT_FRAME_DURATION_MS = 2500
+
+
+async def _run_preview(preset: dict, did: str, client) -> None:
+    """Cycle the preset's frames on the lamp until cancelled.
+
+    Single-frame presets publish once and then idle (we still loop with the
+    default duration, but the publish is the same payload so it's harmless and
+    keeps the loop shape uniform).
+    """
+    if "frames" in preset:
+        frames = preset["frames"]
+        dur_ms = preset.get("frame_duration_ms", _DEFAULT_FRAME_DURATION_MS)
+    else:
+        frames = [preset["payload"]]
+        dur_ms = _DEFAULT_FRAME_DURATION_MS
+    try:
+        while True:
+            for frame in frames:
+                payload = {"d1": 1}
+                payload.update({k: v for k, v in frame.items() if k != "duration_ms"})
+                await client.send_raw(payload, did)
+                await asyncio.sleep(dur_ms / 1000)
+    except asyncio.CancelledError:
+        pass

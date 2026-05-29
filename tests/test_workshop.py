@@ -113,3 +113,58 @@ def test_sanitize_name_rejects_path_traversal():
         workshop._sanitize_name("../escape")
     with pytest.raises(ValueError):
         workshop._sanitize_name("a/b")
+
+
+# --- _run_preview tests -------------------------------------------------------
+
+import asyncio
+
+
+class _FakeClient:
+    """Records every send_raw call as a list of (did, payload-dict) tuples."""
+
+    def __init__(self):
+        self.calls: list[tuple[str, dict]] = []
+
+    async def send_raw(self, d: dict, did: str | None = None):
+        self.calls.append((did, d))
+
+
+@pytest.mark.asyncio
+async def test_run_preview_single_frame_publishes_once_then_idles():
+    client = _FakeClient()
+    preset = {"payload": {"d1": 1, "d2": 2, "d50": "N01:P10001FF0000;"}}
+    task = asyncio.create_task(workshop._run_preview(preset, "abc", client))
+    await asyncio.sleep(0.1)
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    assert len(client.calls) == 1
+    did, payload = client.calls[0]
+    assert did == "abc"
+    assert payload["d50"] == "N01:P10001FF0000;"
+    assert payload["d1"] == 1
+
+
+@pytest.mark.asyncio
+async def test_run_preview_multi_frame_cycles_with_duration():
+    client = _FakeClient()
+    preset = {
+        "frame_duration_ms": 50,
+        "frames": [
+            {"d2": 2, "d50": "N01:P10001FF0000;"},
+            {"d2": 2, "d50": "N01:P1000100FF00;"},
+        ],
+    }
+    task = asyncio.create_task(workshop._run_preview(preset, "abc", client))
+    await asyncio.sleep(0.25)  # ~5 frames at 50ms each
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    d50s = {payload["d50"] for _, payload in client.calls}
+    assert d50s == {"N01:P10001FF0000;", "N01:P1000100FF00;"}
+    assert len(client.calls) >= 2
