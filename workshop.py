@@ -239,7 +239,180 @@ async def api_save(req):
 
 
 # Tiny placeholder page so smoke tests don't 500. Real UI inlined in Task 7.
-_PAGE = "<!doctype html><title>workshop</title><body>workshop loading...</body>"
+_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lepro Preset Workshop</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 0;
+         background: #111; color: #eee; min-height: 100vh; }
+  .wrap { display: grid; grid-template-columns: 320px 1fr; gap: 24px;
+          padding: 20px; max-width: 1100px; margin: 0 auto; }
+  @media (max-width: 760px) { .wrap { grid-template-columns: 1fr; } }
+  h1 { font-size: 18px; margin: 0 0 16px; color: #5fd9d9; }
+  h2 { font-size: 14px; margin: 16px 0 8px; color: #aaa;
+       text-transform: uppercase; letter-spacing: 0.08em; }
+  .card { background: #1c1c1f; padding: 16px; border-radius: 14px;
+          box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+  .preset-row { display: flex; align-items: center; gap: 8px;
+                padding: 10px 12px; border-radius: 10px; cursor: pointer;
+                border: 1px solid transparent; }
+  .preset-row:hover { background: #232328; }
+  .preset-row.selected { border-color: #5fd9d9; background: #1f2a2a; }
+  .preset-name { flex: 1; font-weight: 600; }
+  .preset-meta { font-size: 12px; color: #888; }
+  .palette-row { display: flex; gap: 4px; margin-top: 4px; }
+  .palette-dot { width: 14px; height: 14px; border-radius: 50%;
+                 border: 1px solid #333; }
+  .swatch-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 16px; }
+  .swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .swatch input[type=color] { width: 48px; height: 48px; border: 2px solid #444;
+                              border-radius: 50%; cursor: pointer; background: none; }
+  .swatch-orig { font-size: 11px; color: #888; font-family: ui-monospace, monospace; }
+  label { display: block; font-size: 12px; color: #aaa; margin: 12px 0 4px;
+          text-transform: uppercase; letter-spacing: 0.08em; }
+  input[type=text] { width: 100%; padding: 10px 12px; border-radius: 8px;
+                     background: #2a2a30; color: #eee; border: 1px solid #333;
+                     font: inherit; }
+  .slider-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .slider-row span { width: 88px; font-size: 12px; color: #aaa; }
+  input[type=range] { flex: 1; }
+  input[type=range]:disabled { opacity: .35; cursor: not-allowed; }
+  .soon { font-size: 11px; color: #888; }
+  .btns { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  button { padding: 10px 16px; border-radius: 10px; border: 0;
+           font: inherit; font-weight: 600; cursor: pointer;
+           background: #2a2a30; color: #eee; }
+  button.primary { background: #5fd9d9; color: #111; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  #status { font-size: 12px; color: #777; margin-top: 12px; min-height: 1.2em; }
+  .empty { color: #888; font-style: italic; padding: 20px; text-align: center; }
+</style></head>
+<body><div class="wrap">
+  <div class="card">
+    <h1>← Workshop</h1>
+    <h2>Preset library</h2>
+    <div id="preset-list"></div>
+  </div>
+  <div class="card" id="editor">
+    <div class="empty">Pick an animation on the left to start.</div>
+  </div>
+</div>
+<script type="module">
+const $ = s => document.querySelector(s);
+const list = $('#preset-list');
+const editor = $('#editor');
+let state = { presets: [], selected: null, base: null, palette: [], colorMap: {} };
+
+async function api(path, body) {
+  const r = await fetch(path, body ? {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  } : {});
+  return r.json();
+}
+
+function dot(hex) { return `<span class="palette-dot" style="background:#${hex}"></span>`; }
+
+async function loadPresets() {
+  const j = await api('/api/presets');
+  state.presets = j.presets || [];
+  list.innerHTML = state.presets.map(p => `
+    <div class="preset-row" data-name="${p.name}">
+      <div>
+        <div class="preset-name">${p.name}</div>
+        <div class="preset-meta">${p.frame_count} frame${p.frame_count===1?'':'s'}</div>
+        <div class="palette-row">${p.palette.slice(0,8).map(dot).join('')}</div>
+      </div>
+    </div>
+  `).join('');
+  for (const row of list.querySelectorAll('.preset-row')) {
+    row.onclick = () => selectPreset(row.dataset.name);
+  }
+  if (state.selected && state.presets.find(p => p.name === state.selected)) {
+    list.querySelector(`[data-name="${state.selected}"]`)?.classList.add('selected');
+  }
+}
+
+async function selectPreset(name) {
+  state.selected = name;
+  for (const row of list.querySelectorAll('.preset-row')) {
+    row.classList.toggle('selected', row.dataset.name === name);
+  }
+  const j = await api(`/api/presets/${name}`);
+  if (!j.ok) { editor.innerHTML = `<div class="empty">error: ${j.error}</div>`; return; }
+  state.base = j.preset;
+  state.palette = state.presets.find(p => p.name === name).palette;
+  state.colorMap = Object.fromEntries(state.palette.map(c => [c, c]));
+  renderEditor();
+}
+
+function renderEditor() {
+  const frames = state.base.frames ? state.base.frames.length : 1;
+  editor.innerHTML = `
+    <h1>${state.selected}</h1>
+    <div class="preset-meta">${frames} frame${frames===1?'':'s'}</div>
+    <label>Variant name</label>
+    <input type="text" id="vname" value="${state.selected}-recolored">
+    <label>Color combo (${state.palette.length})</label>
+    <div class="swatch-row">
+      ${state.palette.map((orig,i)=>`
+        <div class="swatch">
+          <input type="color" data-orig="${orig}" value="#${orig}">
+          <span class="swatch-orig">#${orig}</span>
+        </div>
+      `).join('')}
+    </div>
+    <label>Speed</label>
+    <div class="slider-row">
+      <input type="range" disabled value="50">
+      <span class="soon">🚫 decode pending</span>
+    </div>
+    <label>Brightness</label>
+    <div class="slider-row">
+      <input type="range" disabled value="100">
+      <span class="soon">🚫 decode pending</span>
+    </div>
+    <div class="btns">
+      <button class="primary" id="preview">▶ Preview</button>
+      <button id="stop">■ Stop</button>
+      <button id="save">💾 Save</button>
+    </div>
+    <div id="status"></div>
+  `;
+  for (const inp of editor.querySelectorAll('input[type=color]')) {
+    inp.oninput = () => {
+      state.colorMap[inp.dataset.orig] = inp.value.replace('#','').toUpperCase();
+    };
+  }
+  $('#preview').onclick = doPreview;
+  $('#stop').onclick = doStop;
+  $('#save').onclick = doSave;
+}
+
+async function doPreview() {
+  const j = await api('/api/preview', {base_name: state.selected, color_map: state.colorMap});
+  $('#status').textContent = j.ok ? 'preview running…' : 'error: ' + j.error;
+}
+async function doStop() {
+  const j = await api('/api/stop', {});
+  $('#status').textContent = j.ok ? 'stopped' : 'error: ' + j.error;
+}
+async function doSave() {
+  const name = $('#vname').value.trim();
+  if (!name) { $('#status').textContent = 'name required'; return; }
+  const j = await api('/api/save', {new_name: name, base_name: state.selected, color_map: state.colorMap});
+  if (!j.ok) { $('#status').textContent = 'error: ' + j.error; return; }
+  $('#status').textContent = 'saved → ' + j.path;
+  state.selected = name;
+  await loadPresets();
+  await selectPreset(name);
+}
+
+loadPresets();
+</script></body></html>"""
 
 
 async def _on_startup(app):
