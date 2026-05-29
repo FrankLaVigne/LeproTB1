@@ -78,3 +78,16 @@ def _holders(preset: dict):
     payload = preset.get("payload")
     if payload and "d50" in payload:
         yield payload
+
+
+_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+
+def _sanitize_name(name: str) -> str:
+    """Validate a kebab-case preset name. Raises ValueError on invalid input."""
+    if not isinstance(name, str) or not _NAME_RE.match(name):
+        raise ValueError(
+            f"preset name {name!r} must be kebab-case "
+            "([a-z0-9][a-z0-9-]*) — no spaces, uppercase, or path separators"
+        )
+    return name

@@ -84,3 +84,32 @@ def test_apply_color_map_empty_map_is_deep_copy():
     assert out == preset
     assert out is not preset
     assert out["payload"] is not preset["payload"]
+
+
+# --- _sanitize_name tests -----------------------------------------------------
+
+
+def test_sanitize_name_passes_simple_kebab():
+    assert workshop._sanitize_name("cyberpunk-warm") == "cyberpunk-warm"
+
+
+def test_sanitize_name_rejects_empty():
+    with pytest.raises(ValueError):
+        workshop._sanitize_name("")
+
+
+def test_sanitize_name_rejects_uppercase():
+    with pytest.raises(ValueError):
+        workshop._sanitize_name("CyberpunkWarm")
+
+
+def test_sanitize_name_rejects_spaces():
+    with pytest.raises(ValueError):
+        workshop._sanitize_name("cyber punk")
+
+
+def test_sanitize_name_rejects_path_traversal():
+    with pytest.raises(ValueError):
+        workshop._sanitize_name("../escape")
+    with pytest.raises(ValueError):
+        workshop._sanitize_name("a/b")
