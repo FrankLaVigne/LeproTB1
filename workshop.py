@@ -857,7 +857,10 @@ _PAGE = """<!doctype html>
 <body><div class="wrap">
   <div class="card">
     <div class="header">
-      <h1>← Workshop</h1>
+      <div class="tabs">
+        <a href="/" class="active" style="color:#5fd9d9;background:#1f2a2a;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700">🎨 Workshop</a>
+        <a href="/diy" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">✏️ DIY</a>
+      </div>
       <div class="power-btns">
         <button class="on" id="pwr-on">⏻ On</button>
         <button class="off" id="pwr-off">⏻ Off</button>
