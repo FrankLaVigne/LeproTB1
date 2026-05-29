@@ -221,3 +221,61 @@ def test_segments_total_coverage_is_196():
         for i in range(count):
             total += len(workshop.segments_to_leds(ring, i))
     assert total == 196
+
+
+# --- effect_tail tests --------------------------------------------------------
+
+
+def test_effect_tail_steady_no_speed_field():
+    # Steady is the only effect with no {sp} field.
+    assert workshop.effect_tail("Steady", 50) == "000640000E1"
+
+
+def test_effect_tail_breathe_at_speed_50():
+    # Breathe uses {sp} twice in the tail.
+    tail = workshop.effect_tail("Breathe", 50)
+    assert tail.startswith("000640000E4")
+    assert tail.endswith("1664")
+    # the two {sp} segments are identical 4-hex strings
+    assert tail[11:15] == tail[19:23]
+
+
+def test_effect_tail_gradient_has_C2O6():
+    tail = workshop.effect_tail("Gradient", 50)
+    assert tail.startswith("100640000E3")
+    assert "C2O6" in tail
+
+
+def test_effect_tail_leftward_format():
+    tail = workshop.effect_tail("Leftward", 50)
+    assert tail.startswith("00164")
+    assert tail.endswith("E1")
+    assert len(tail) == 11  # 00164 (5) + sp (4) + E1 (2)
+
+
+def test_effect_tail_rightward_format():
+    tail = workshop.effect_tail("Rightward", 50)
+    assert tail.startswith("00264")
+    assert tail.endswith("E1")
+
+
+def test_effect_tail_circle_format():
+    tail = workshop.effect_tail("Circle", 50)
+    assert tail.startswith("100640000E1C2O6")
+
+
+def test_effect_tail_speed_zero_special_case():
+    # Speed 0 should still produce a valid tail with the well-known "1000" speed slot.
+    tail = workshop.effect_tail("Leftward", 0)
+    assert tail.startswith("00164")
+    assert tail.endswith("E1")
+
+
+def test_effect_tail_speed_clamps_above_100():
+    # Anything > 100 should clamp to 100 (same speed-hex as 100).
+    assert workshop.effect_tail("Leftward", 500) == workshop.effect_tail("Leftward", 100)
+
+
+def test_effect_tail_unknown_effect_raises():
+    with pytest.raises(ValueError):
+        workshop.effect_tail("WiggleJiggle", 50)

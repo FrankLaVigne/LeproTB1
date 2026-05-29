@@ -10,6 +10,7 @@ import asyncio
 import copy
 import json
 import logging
+import math
 import os
 import re
 from pathlib import Path
@@ -139,6 +140,44 @@ def segments_to_leds(ring: str, segment_idx: int) -> range:
         raise IndexError(f"{ring} segment index {segment_idx} out of range (0..{len(segments) - 1})")
     start, stop = segments[segment_idx]
     return range(start, stop)
+
+
+def _speed_to_hex(speed: int) -> str:
+    """Encode a 0-100 speed into the 4-char hex slot the d50 effects expect.
+
+    Re-uses the reference integration's log-scale formula
+    (also lives in lepro.py as _speed_to_hex):
+       raw = round(-117.41 * ln(speed + 1) + 597.75)
+       returns "0XXX" (4 hex chars; high byte 0)
+    Speed 0 is the special "1000" sentinel.
+    """
+    s = max(0, min(100, int(speed)))
+    if s <= 0:
+        return "1000"
+    raw = int(round(-117.41 * math.log(s + 1) + 597.75))
+    return f"0{raw:03X}"
+
+
+def effect_tail(name: str, speed: int) -> str:
+    """Compose the d50 effect tail for one of the six confirmed effects.
+
+    Raises ValueError on unknown effect names.
+    """
+    sp = _speed_to_hex(speed)
+    if name == "Steady":
+        return "000640000E1"
+    if name == "Breathe":
+        return f"000640000E4{sp}0000{sp}1664"
+    if name == "Gradient":
+        return f"100640000E3{sp}C2O6{sp}"
+    if name == "Leftward":
+        return f"00164{sp}E1"
+    if name == "Rightward":
+        return f"00264{sp}E1"
+    if name == "Circle":
+        return f"100640000E1C2O6{sp}"
+    raise ValueError(f"unknown effect {name!r}; expected one of "
+                     "Steady, Breathe, Gradient, Leftward, Rightward, Circle")
 
 
 async def _run_preview(preset: dict, did: str, client) -> None:
