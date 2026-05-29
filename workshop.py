@@ -180,6 +180,17 @@ async def api_preset(req):
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
 
+async def api_power(req):
+    """Turn the lamp on or off (does NOT cancel a running preview — orthogonal)."""
+    try:
+        body = await req.json()
+        on = bool(body.get("on"))
+        await _client.power(on)
+        return web.json_response({"ok": True, "on": on})
+    except (LeproError, ValueError, KeyError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
 async def api_preview(req):
     global _preview_task
     try:
@@ -289,10 +300,23 @@ _PAGE = """<!doctype html>
   button:disabled { opacity: .4; cursor: not-allowed; }
   #status { font-size: 12px; color: #777; margin-top: 12px; min-height: 1.2em; }
   .empty { color: #888; font-style: italic; padding: 20px; text-align: center; }
+  .header { display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; margin-bottom: 8px; }
+  .header h1 { margin: 0; }
+  .power-btns { display: flex; gap: 6px; }
+  .power-btns button { padding: 6px 12px; font-size: 13px; }
+  .power-btns button.on { background: #2c8f4f; color: #fff; }
+  .power-btns button.off { background: #8f2c2c; color: #fff; }
 </style></head>
 <body><div class="wrap">
   <div class="card">
-    <h1>← Workshop</h1>
+    <div class="header">
+      <h1>← Workshop</h1>
+      <div class="power-btns">
+        <button class="on" id="pwr-on">⏻ On</button>
+        <button class="off" id="pwr-off">⏻ Off</button>
+      </div>
+    </div>
     <h2>Preset library</h2>
     <div id="preset-list"></div>
   </div>
@@ -411,6 +435,16 @@ async function doSave() {
   await selectPreset(name);
 }
 
+// Power buttons live in the persistent header, wired once at page load.
+$('#pwr-on').onclick = async () => {
+  const j = await api('/api/power', {on: true});
+  $('#status') && ($('#status').textContent = j.ok ? 'lamp on' : 'error: ' + j.error);
+};
+$('#pwr-off').onclick = async () => {
+  const j = await api('/api/power', {on: false});
+  $('#status') && ($('#status').textContent = j.ok ? 'lamp off' : 'error: ' + j.error);
+};
+
 loadPresets();
 </script></body></html>"""
 
@@ -450,6 +484,7 @@ def build_app() -> web.Application:
         web.get("/", index),
         web.get("/api/presets", api_presets),
         web.get(r"/api/presets/{name}", api_preset),
+        web.post("/api/power", api_power),
         web.post("/api/preview", api_preview),
         web.post("/api/stop", api_stop),
         web.post("/api/save", api_save),
