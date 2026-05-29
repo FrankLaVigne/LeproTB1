@@ -388,7 +388,7 @@ async def api_diy_paint(req):
         d50 = build_d50_from_leds(leds, effect, speed)
         await _client.send_raw({"d1": 1, "d2": 2, "d50": d50})
         return web.json_response({"ok": True})
-    except (LeproError, ValueError, KeyError) as e:
+    except (LeproError, ValueError, KeyError, TypeError) as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
 
@@ -419,7 +419,7 @@ async def api_diy_save(req):
         }
         path.write_text(json.dumps(preset, indent=2) + "\n")
         return web.json_response({"ok": True, "path": str(path.relative_to(_HERE))})
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, TypeError) as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
 
@@ -431,7 +431,7 @@ async def api_brightness(req):
             raise ValueError(f"brightness value must be 0..1000, got {value}")
         await _client.send_raw({"d52": value})
         return web.json_response({"ok": True})
-    except (LeproError, ValueError, KeyError) as e:
+    except (LeproError, ValueError, KeyError, TypeError) as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
 
