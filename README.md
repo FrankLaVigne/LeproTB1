@@ -141,6 +141,15 @@ animation to the lamp live; Save writes a new file under `presets/`.
 LAN-only — no auth. Override the bind address with `LEPRO_WORKSHOP_HOST` /
 `LEPRO_WORKSHOP_PORT`. Coexists with `app.py` (8080) and the MCP server (8765).
 
+The workshop now also includes a **DIY editor** at `http://<vm-ip>:8081/diy`,
+mimicking the Lepro app's DIY screen — a clickable 3-ring SVG canvas (48 app-
+matched segments or 196 per-LED resolution via toggle), Draw/Fill/Erase/Back
+tools, color picker with quick-pick swatches, the six confirmed motion effects
+(Steady/Breathe/Gradient/Leftward/Rightward/Circle), speed and brightness
+sliders, and Save (which writes a single-frame preset into `presets/`). Every
+stroke updates the lamp live via the cloud, with client-side 100 ms throttling
+to coalesce drag movements.
+
 ## Protocol notes
 
 Control commands are an MQTT publish to `le/{deviceId}/prp/set` with payload
