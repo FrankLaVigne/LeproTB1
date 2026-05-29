@@ -364,6 +364,7 @@ _PAGE_TICKER = """<!doctype html>
       <a href="/">&#x1F3A8; Workshop</a>
       <a href="/diy">&#x270F;&#xFE0F; DIY</a>
       <a href="/ticker" class="active">&#x1F4C8; Ticker</a>
+      <a href="/state">&#x1F4CA; State</a>
     </div>
     <div class="power-btns">
       <button class="on" id="pwr-on">On</button>
@@ -546,6 +547,128 @@ setInterval(refresh, 5000);
 </script></body></html>"""
 
 
+_PAGE_STATE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lepro State</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 0;
+         background: #111; color: #eee; min-height: 100vh; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+  .header { display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; margin-bottom: 12px; }
+  .tabs a { color: #aaa; text-decoration: none; padding: 6px 12px;
+            border-radius: 8px; font-weight: 600; }
+  .tabs a.active { color: #5fd9d9; background: #1f2a2a; }
+  .card { background: #1c1c1f; padding: 14px; border-radius: 14px;
+          box-shadow: 0 4px 16px rgba(0,0,0,.4); margin-bottom: 14px; }
+  h2 { font-size: 12px; margin: 0 0 8px; color: #aaa;
+       text-transform: uppercase; letter-spacing: 0.08em; }
+  .device-id { font: 13px ui-monospace, monospace; color: #888;
+               margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; color: #888;
+       text-transform: uppercase; letter-spacing: 0.08em;
+       padding: 6px 10px; border-bottom: 1px solid #2a2a30; }
+  td { padding: 8px 10px; border-bottom: 1px solid #1f1f23;
+       vertical-align: top; }
+  td.k { font: 13px ui-monospace, monospace; color: #5fd9d9; width: 60px; }
+  td.v { font: 13px ui-monospace, monospace; color: #eee;
+         word-break: break-all; }
+  td.meaning { font-size: 12px; color: #888; }
+  #polled { font-size: 12px; color: #777; margin-top: 8px; }
+  .empty { color: #777; font-style: italic; padding: 20px;
+           text-align: center; }
+</style></head>
+<body><div class="wrap">
+  <div class="header">
+    <div class="tabs">
+      <a href="/">&#x1F3A8; Workshop</a>
+      <a href="/diy">&#x270F;&#xFE0F; DIY</a>
+      <a href="/ticker">&#x1F4C8; Ticker</a>
+      <a href="/state" class="active">&#x1F4CA; State</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Lamp state (live)</h2>
+    <div id="content" class="empty">waiting for state…</div>
+    <div id="polled"></div>
+  </div>
+
+  <div class="card">
+    <h2>Field reference</h2>
+    <table>
+      <tr><td class="k">d1</td><td class="meaning">power (0 = off, 1 = on)</td></tr>
+      <tr><td class="k">d2</td><td class="meaning">mode (2 = segmented / d50 driven)</td></tr>
+      <tr><td class="k">d3</td><td class="meaning">global brightness (white modes)</td></tr>
+      <tr><td class="k">d4</td><td class="meaning">white color temperature</td></tr>
+      <tr><td class="k">d5</td><td class="meaning">HSV color (single-color mode)</td></tr>
+      <tr><td class="k">d30</td><td class="meaning">scene/preset id</td></tr>
+      <tr><td class="k">d50</td><td class="meaning">per-LED segmented pattern (the rich one)</td></tr>
+      <tr><td class="k">d52</td><td class="meaning">brightness for segmented mode (0–1000)</td></tr>
+      <tr><td class="k">d60</td><td class="meaning">special-effect id</td></tr>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+
+function renderState(data) {
+  const content = $('#content');
+  const polled = $('#polled');
+  polled.textContent = data.polled_at ? 'polled at ' + data.polled_at : '';
+
+  const dids = Object.keys(data.devices || {});
+  if (!dids.length) {
+    content.innerHTML = '<div class="empty">no state reported yet (the lamp publishes on changes — try toggling power or sending a paint)</div>';
+    return;
+  }
+
+  let html = '';
+  for (const did of dids) {
+    const fields = data.devices[did] || {};
+    html += `<div class="device-id">device: ${did}</div>`;
+    html += '<table><tr><th>field</th><th>value</th></tr>';
+    const keys = Object.keys(fields).sort((a, b) => {
+      // Sort d1, d2, d3, ..., d50, d52, d60 numerically by the suffix.
+      const na = parseInt(a.replace(/[^0-9]/g, ''), 10);
+      const nb = parseInt(b.replace(/[^0-9]/g, ''), 10);
+      return na - nb;
+    });
+    for (const k of keys) {
+      let v = fields[k];
+      if (typeof v === 'string' && v.length > 80) {
+        // Truncate long d50 strings with a tooltip.
+        v = `<span title="${v.replace(/"/g, '&quot;')}">${v.slice(0, 80)}…</span>`;
+      } else {
+        v = String(v);
+      }
+      html += `<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`;
+    }
+    html += '</table>';
+  }
+  content.innerHTML = html;
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/lamp/state');
+    const j = await r.json();
+    renderState(j);
+  } catch (e) {
+    $('#polled').textContent = 'error: ' + e.message;
+  }
+}
+
+refresh();
+setInterval(refresh, 2000);
+</script></body></html>"""
+
+
 # Real DIY UI inlined in Task 6.
 _PAGE_DIY = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -619,6 +742,7 @@ _PAGE_DIY = """<!doctype html>
       <a href="/">&#x1F3A8; Workshop</a>
       <a href="/diy" class="active">&#x270F;&#xFE0F; DIY</a>
       <a href="/ticker">&#x1F4C8; Ticker</a>
+      <a href="/state">&#x1F4CA; State</a>
     </div>
     <div class="power-btns">
       <button class="on" id="pwr-on">&#x23FB; On</button>
@@ -1179,6 +1303,27 @@ async def api_ticker_state(_req):
     return web.json_response(_ticker_session.snapshot())
 
 
+async def api_lamp_state(_req):
+    """Return the lamp's most recently reported state.
+
+    The workshop's _on_startup spawns _client.listen_forever() which
+    populates _client.state[did] from MQTT state-update messages. This
+    endpoint returns that cached snapshot plus a poll timestamp so the
+    page can show 'last polled X seconds ago'.
+    """
+    from datetime import datetime, timezone
+    if _client is None:
+        return web.json_response({"devices": {}, "polled_at": None})
+    return web.json_response({
+        "devices": dict(_client.state),
+        "polled_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    })
+
+
+async def index_state(_req):
+    return web.Response(text=_PAGE_STATE, content_type="text/html")
+
+
 # Tiny placeholder page so smoke tests don't 500. Real UI inlined in Task 7.
 _PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -1245,6 +1390,7 @@ _PAGE = """<!doctype html>
         <a href="/" class="active" style="color:#5fd9d9;background:#1f2a2a;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700">🎨 Workshop</a>
         <a href="/diy" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">✏️ DIY</a>
         <a href="/ticker" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">📈 Ticker</a>
+        <a href="/state" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">📊 State</a>
       </div>
       <div class="power-btns">
         <button class="on" id="pwr-on">⏻ On</button>
@@ -1418,6 +1564,7 @@ def build_app() -> web.Application:
         web.get("/", index),
         web.get("/diy", index_diy),
         web.get("/ticker", index_ticker),
+        web.get("/state", index_state),
         web.get("/api/presets", api_presets),
         web.get(r"/api/presets/{name}", api_preset),
         web.post("/api/power", api_power),
@@ -1432,6 +1579,7 @@ def build_app() -> web.Application:
         web.post("/api/ticker/start", api_ticker_start),
         web.post("/api/ticker/stop", api_ticker_stop),
         web.get("/api/ticker/state", api_ticker_state),
+        web.get("/api/lamp/state", api_lamp_state),
     ])
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
