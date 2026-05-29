@@ -35,3 +35,31 @@ def decide_ring_color(prev_price, now_price, prev_color):
         new_color = prev_color if prev_color is not None else COLOR_WHITE
     ticked = new_color != prev_color
     return new_color, ticked
+
+
+def build_ticker_d50(rings, flash_color):
+    """Compose the d50 string for the lamp.
+
+    ``rings`` is a dict shaped like::
+        {"outer": {"color": "00FF00"}, "middle": {...}, "inner": {...}}
+
+    When ``flash_color`` is None: emits a per-ring multi-color Steady d50.
+    When ``flash_color`` is non-None: emits a single-color (flash_color)
+    full-lamp Breathe d50 — the per-ring colors are intentionally hidden
+    during the 5-second flash window. (Imported here to avoid a circular
+    import: workshop.build_d50_from_leds + workshop.effect_tail are the
+    canonical d50 encoders.)
+    """
+    # Local import — ticker is loaded by workshop, but the d50 helpers we
+    # need are defined at module scope in workshop, so import them here.
+    from workshop import build_d50_from_leds  # noqa: PLC0415
+
+    if flash_color is not None:
+        leds = [flash_color] * 196
+        return build_d50_from_leds(leds, "Breathe", 50)
+
+    outer = rings["outer"]["color"]
+    middle = rings["middle"]["color"]
+    inner = rings["inner"]["color"]
+    leds = [outer] * 88 + [middle] * 62 + [inner] * 46
+    return build_d50_from_leds(leds, "Steady", 50)
