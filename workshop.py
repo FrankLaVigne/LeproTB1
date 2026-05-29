@@ -270,7 +270,359 @@ async def index_diy(_req):
 
 
 # Real DIY UI inlined in Task 6.
-_PAGE_DIY = "<!doctype html><title>diy</title><body>diy loading...</body>"
+_PAGE_DIY = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lepro DIY</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 0;
+         background: #111; color: #eee; min-height: 100vh; }
+  .wrap { max-width: 540px; margin: 0 auto; padding: 16px; }
+  .header { display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; margin-bottom: 12px; }
+  .tabs a { color: #aaa; text-decoration: none; padding: 6px 12px;
+            border-radius: 8px; }
+  .tabs a.active { color: #5fd9d9; background: #1f2a2a; font-weight: 700; }
+  .power-btns { display: flex; gap: 6px; }
+  .power-btns button { padding: 6px 12px; font-size: 13px; border: 0;
+                       border-radius: 8px; cursor: pointer; font-weight: 600; }
+  .power-btns button.on { background: #2c8f4f; color: #fff; }
+  .power-btns button.off { background: #8f2c2c; color: #fff; }
+  .card { background: #1c1c1f; padding: 14px; border-radius: 14px;
+          box-shadow: 0 4px 16px rgba(0,0,0,.4); margin-bottom: 14px; }
+  .lamp-canvas { display: flex; justify-content: center; padding: 12px 0; }
+  svg .seg { cursor: pointer; transition: opacity .1s; }
+  svg .seg:hover { opacity: .7; }
+  .toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar button { padding: 8px 12px; border: 0; border-radius: 8px;
+                    background: #2a2a30; color: #eee; cursor: pointer;
+                    font: inherit; }
+  .toolbar button.active { background: #5fd9d9; color: #111; font-weight: 700; }
+  .toolbar .res { margin-left: auto; display: flex; gap: 2px;
+                  background: #2a2a30; padding: 2px; border-radius: 8px; }
+  .toolbar .res button { padding: 6px 10px; background: transparent;
+                         border-radius: 6px; }
+  .toolbar .res button.active { background: #5fd9d9; color: #111; }
+  h2 { font-size: 12px; margin: 0 0 8px; color: #aaa;
+       text-transform: uppercase; letter-spacing: 0.08em; }
+  .color-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .color-row input[type=color] { width: 44px; height: 44px; border: 2px solid #444;
+                                  border-radius: 50%; cursor: pointer; background: none; }
+  .swatch { width: 28px; height: 28px; border-radius: 50%;
+            border: 2px solid #333; cursor: pointer; }
+  .swatch:hover { border-color: #5fd9d9; }
+  .effect-grid { display: grid; grid-template-columns: repeat(3, 1fr);
+                 gap: 8px; margin-bottom: 14px; }
+  .effect-grid button { padding: 10px; border: 0; border-radius: 8px;
+                        background: #2a2a30; color: #eee; cursor: pointer;
+                        font: inherit; }
+  .effect-grid button.active { background: #5fd9d9; color: #111; font-weight: 700; }
+  .slider-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+  .slider-row .icon { width: 22px; text-align: center; }
+  .slider-row input[type=range] { flex: 1; }
+  .slider-row .val { min-width: 38px; text-align: right;
+                     font: 13px ui-monospace, monospace; color: #aaa; }
+  label { display: block; font-size: 12px; color: #aaa; margin: 12px 0 4px;
+          text-transform: uppercase; letter-spacing: 0.08em; }
+  input[type=text] { width: 100%; padding: 10px 12px; border-radius: 8px;
+                     background: #2a2a30; color: #eee; border: 1px solid #333;
+                     font: inherit; }
+  .btns { display: flex; gap: 8px; margin-top: 12px; }
+  .btns button { flex: 1; padding: 10px; border: 0; border-radius: 10px;
+                 background: #2a2a30; color: #eee; cursor: pointer;
+                 font: inherit; font-weight: 600; }
+  .btns button.primary { background: #5fd9d9; color: #111; }
+  #status { font-size: 12px; color: #777; margin-top: 8px; min-height: 1.2em; }
+</style></head>
+<body><div class="wrap">
+  <div class="header">
+    <div class="tabs">
+      <a href="/">&#x1F3A8; Workshop</a>
+      <a href="/diy" class="active">&#x270F;&#xFE0F; DIY</a>
+    </div>
+    <div class="power-btns">
+      <button class="on" id="pwr-on">&#x23FB; On</button>
+      <button class="off" id="pwr-off">&#x23FB; Off</button>
+    </div>
+  </div>
+
+  <div class="card lamp-canvas">
+    <svg id="lamp" width="380" height="380" viewBox="-200 -200 400 400"></svg>
+  </div>
+
+  <div class="toolbar">
+    <button class="tool active" data-tool="draw">&#x270F;&#xFE0F; Draw</button>
+    <button class="tool" data-tool="fill">&#x1FAA3; Fill</button>
+    <button class="tool" data-tool="erase">&#x1F9FD; Erase</button>
+    <button id="back-btn">&#x21A9; Back</button>
+    <div class="res">
+      <button class="res-btn active" data-res="48">48</button>
+      <button class="res-btn" data-res="196">196</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Color</h2>
+    <div class="color-row">
+      <input type="color" id="picker" value="#ff8000">
+      <div class="swatch" style="background:#FF0000" data-hex="FF0000"></div>
+      <div class="swatch" style="background:#FF8000" data-hex="FF8000"></div>
+      <div class="swatch" style="background:#FFFF00" data-hex="FFFF00"></div>
+      <div class="swatch" style="background:#00C000" data-hex="00C000"></div>
+      <div class="swatch" style="background:#00FFFF" data-hex="00FFFF"></div>
+      <div class="swatch" style="background:#0000FF" data-hex="0000FF"></div>
+      <div class="swatch" style="background:#8000FF" data-hex="8000FF"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Effect</h2>
+    <div class="effect-grid">
+      <button class="fx active" data-fx="Steady">Steady</button>
+      <button class="fx" data-fx="Breathe">Breathe</button>
+      <button class="fx" data-fx="Gradient">Gradient</button>
+      <button class="fx" data-fx="Leftward">Leftward</button>
+      <button class="fx" data-fx="Rightward">Rightward</button>
+      <button class="fx" data-fx="Circle">Circle</button>
+    </div>
+    <div class="slider-row">
+      <span class="icon">&#x26A1;</span>
+      <input type="range" id="speed" min="0" max="100" value="50">
+      <span class="val" id="speed-val">50</span>
+    </div>
+    <div class="slider-row">
+      <span class="icon">&#x2600;</span>
+      <input type="range" id="bright" min="0" max="100" value="100">
+      <span class="val" id="bright-val">100</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Save as</label>
+    <input type="text" id="vname" value="">
+    <div class="btns">
+      <button class="primary" id="save-btn">&#x1F4BE; Save</button>
+      <button id="reset-btn">&#x21BA; Reset</button>
+    </div>
+    <div id="status"></div>
+  </div>
+</div>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+const OUTER = Array.from({length:22}, (_,i) => [i*4, i*4+4]);
+const MIDDLE = [
+  ...Array.from({length:13}, (_,i) => [88+i*4, 88+i*4+4]),
+  [140,145], [145,150],
+];
+const INNER = [
+  ...Array.from({length:9}, (_,i) => [150+i*4, 150+i*4+4]),
+  [186,191], [191,196],
+];
+
+const state = {
+  leds: new Array(196).fill(null),
+  tool: 'draw',
+  color: 'FF8000',
+  effect: 'Steady',
+  speed: 50,
+  bright: 100,
+  res: 48,
+  dragging: false,
+  history: [],
+};
+
+function snapshot() {
+  state.history.push(state.leds.slice());
+  if (state.history.length > 20) state.history.shift();
+}
+
+function arcPath(r0, r1, a0, a1) {
+  const toXY = (r, a) => [r*Math.cos(a), r*Math.sin(a)];
+  const [x0a, y0a] = toXY(r0, a0);
+  const [x1a, y1a] = toXY(r1, a0);
+  const [x1b, y1b] = toXY(r1, a1);
+  const [x0b, y0b] = toXY(r0, a1);
+  const large = (a1 - a0) > Math.PI ? 1 : 0;
+  return `M${x0a},${y0a} L${x1a},${y1a} A${r1},${r1} 0 ${large} 1 ${x1b},${y1b}`
+       + ` L${x0b},${y0b} A${r0},${r0} 0 ${large} 0 ${x0a},${y0a} Z`;
+}
+
+const RING_GEOMETRY = {
+  outer:  {r0: 130, r1: 180},
+  middle: {r0: 90,  r1: 125},
+  inner:  {r0: 50,  r1: 85},
+};
+
+function drawCanvas() {
+  const svg = $('#lamp');
+  svg.innerHTML = '';
+  const rings = state.res === 48
+    ? [['outer', OUTER], ['middle', MIDDLE], ['inner', INNER]]
+    : [['outer', segments196('outer')],
+       ['middle', segments196('middle')],
+       ['inner', segments196('inner')]];
+  for (const [name, segs] of rings) {
+    const g = RING_GEOMETRY[name];
+    const total = segs.length;
+    for (let i = 0; i < total; i++) {
+      const [start, stop] = segs[i];
+      const a0 = (i / total) * 2 * Math.PI - Math.PI / 2;
+      const a1 = ((i + 1) / total) * 2 * Math.PI - Math.PI / 2;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', arcPath(g.r0, g.r1, a0, a1));
+      const color = state.leds[start];
+      path.setAttribute('fill', color ? `#${color}` : '#000');
+      path.setAttribute('stroke', '#1c1c1f');
+      path.setAttribute('stroke-width', '1');
+      path.classList.add('seg');
+      path.dataset.start = start;
+      path.dataset.stop = stop;
+      svg.appendChild(path);
+    }
+  }
+}
+
+function segments196(ring) {
+  const start = ring === 'outer' ? 0 : ring === 'middle' ? 88 : 150;
+  const stop = ring === 'outer' ? 88 : ring === 'middle' ? 150 : 196;
+  return Array.from({length: stop - start}, (_, i) => [start + i, start + i + 1]);
+}
+
+function paintRange(start, stop, color) {
+  for (let i = start; i < stop; i++) state.leds[i] = color;
+}
+
+async function applyTool(start, stop) {
+  if (state.tool === 'draw')  paintRange(start, stop, state.color);
+  if (state.tool === 'erase') paintRange(start, stop, null);
+  drawCanvas();
+  pushPaint();
+}
+
+let throttled = false, pending = null;
+async function pushPaint() {
+  const body = {leds: state.leds, effect: state.effect, speed: state.speed};
+  pending = body;
+  if (throttled) return;
+  throttled = true;
+  const send = pending; pending = null;
+  await api('/api/diy/paint', send);
+  setTimeout(async () => {
+    throttled = false;
+    if (pending) { const s = pending; pending = null; await api('/api/diy/paint', s); }
+  }, 100);
+}
+
+async function api(path, body) {
+  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
+                                body: JSON.stringify(body)});
+  const j = await r.json();
+  if (!j.ok) $('#status').textContent = 'error: ' + j.error;
+  else if (j.path) $('#status').textContent = 'saved → ' + j.path;
+  else $('#status').textContent = '';
+  return j;
+}
+
+function setActiveButton(selector, value, attr) {
+  for (const b of $$(selector)) b.classList.toggle('active', b.dataset[attr] === value);
+}
+
+for (const b of $$('.tool')) b.onclick = () => {
+  state.tool = b.dataset.tool;
+  setActiveButton('.tool', state.tool, 'tool');
+  if (state.tool === 'fill') {
+    snapshot();
+    state.leds = new Array(196).fill(state.color);
+    drawCanvas();
+    pushPaint();
+  }
+};
+for (const b of $$('.res-btn')) b.onclick = () => {
+  state.res = parseInt(b.dataset.res, 10);
+  setActiveButton('.res-btn', String(state.res), 'res');
+  drawCanvas();
+};
+for (const b of $$('.swatch')) b.onclick = () => {
+  state.color = b.dataset.hex;
+  $('#picker').value = '#' + state.color;
+};
+$('#picker').oninput = e => state.color = e.target.value.replace('#','').toUpperCase();
+for (const b of $$('.fx')) b.onclick = () => {
+  state.effect = b.dataset.fx;
+  setActiveButton('.fx', state.effect, 'fx');
+  pushPaint();
+};
+$('#speed').oninput = e => {
+  state.speed = parseInt(e.target.value, 10);
+  $('#speed-val').textContent = state.speed;
+  pushPaint();
+};
+$('#bright').oninput = e => {
+  state.bright = parseInt(e.target.value, 10);
+  $('#bright-val').textContent = state.bright;
+  api('/api/brightness', {value: Math.round(state.bright * 10)});
+};
+$('#back-btn').onclick = () => {
+  if (!state.history.length) return;
+  state.leds = state.history.pop();
+  drawCanvas();
+  pushPaint();
+};
+$('#reset-btn').onclick = () => {
+  snapshot();
+  state.leds = new Array(196).fill(null);
+  state.effect = 'Steady';
+  state.speed = 50;
+  state.bright = 100;
+  setActiveButton('.fx', 'Steady', 'fx');
+  $('#speed').value = 50; $('#speed-val').textContent = 50;
+  $('#bright').value = 100; $('#bright-val').textContent = 100;
+  drawCanvas();
+  pushPaint();
+};
+$('#pwr-on').onclick = () => api('/api/power', {on: true});
+$('#pwr-off').onclick = () => api('/api/power', {on: false});
+$('#save-btn').onclick = async () => {
+  const name = $('#vname').value.trim();
+  if (!name) { $('#status').textContent = 'name required'; return; }
+  await api('/api/diy/save', {name, leds: state.leds,
+                              effect: state.effect, speed: state.speed});
+};
+
+async function setDefaultName() {
+  const today = new Date().toISOString().slice(0, 10);
+  const j = await fetch('/api/presets').then(r => r.json());
+  const names = (j.presets || []).map(p => p.name);
+  let n = 1;
+  while (names.includes(`diy-${today}-${n}`)) n++;
+  $('#vname').value = `diy-${today}-${n}`;
+}
+
+const svg = $('#lamp');
+svg.addEventListener('mousedown', e => {
+  if (e.target.classList.contains('seg')) {
+    state.dragging = true;
+    if (state.tool === 'draw' || state.tool === 'erase') snapshot();
+    applyTool(parseInt(e.target.dataset.start, 10),
+              parseInt(e.target.dataset.stop, 10));
+  }
+});
+window.addEventListener('mouseup', () => state.dragging = false);
+svg.addEventListener('mouseover', e => {
+  if (state.dragging && e.target.classList.contains('seg')) {
+    applyTool(parseInt(e.target.dataset.start, 10),
+              parseInt(e.target.dataset.stop, 10));
+  }
+});
+
+drawCanvas();
+setDefaultName();
+</script></body></html>"""
 
 
 async def api_presets(_req):
