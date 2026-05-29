@@ -349,30 +349,29 @@ def test_build_d50_from_leds_rejects_wrong_length():
 
 
 # --- apply_lamp_rotation tests ------------------------------------------------
+# Assertions reference workshop's rotation constants so empirical tuning of
+# the calibration values (CALIBRATION.md) doesn't break these tests.
 
 
-def test_apply_lamp_rotation_outer_page0_lands_at_physical_29():
+def test_apply_lamp_rotation_outer_page0_uses_outer_rotation_offset():
     page = [None] * 196
     page[0] = "FF0000"
     physical = workshop.apply_lamp_rotation(page)
-    assert physical[29] == "FF0000"
-    assert physical[0] is None  # nothing painted at physical 0
+    assert physical[workshop._OUTER_ROTATION % 88] == "FF0000"
 
 
-def test_apply_lamp_rotation_middle_page88_lands_at_physical_109():
+def test_apply_lamp_rotation_middle_page88_uses_middle_rotation_offset():
     page = [None] * 196
     page[88] = "00FF00"
     physical = workshop.apply_lamp_rotation(page)
-    assert physical[88 + 21] == "00FF00"
-    assert physical[88] is None
+    assert physical[88 + (workshop._MIDDLE_ROTATION % 62)] == "00FF00"
 
 
-def test_apply_lamp_rotation_inner_page150_lands_at_physical_154():
+def test_apply_lamp_rotation_inner_page150_uses_inner_rotation_offset():
     page = [None] * 196
     page[150] = "0000FF"
     physical = workshop.apply_lamp_rotation(page)
-    assert physical[150 + 4] == "0000FF"
-    assert physical[150] is None
+    assert physical[150 + (workshop._INNER_ROTATION % 46)] == "0000FF"
 
 
 def test_apply_lamp_rotation_each_ring_wraps_independently():
@@ -383,12 +382,9 @@ def test_apply_lamp_rotation_each_ring_wraps_independently():
     page[149] = "00FF00"  # last of middle ring
     page[195] = "0000FF"  # last of inner ring
     physical = workshop.apply_lamp_rotation(page)
-    # Outer: (87 + 29) % 88 = 28
-    assert physical[28] == "FF0000"
-    # Middle: 88 + (61 + 21) % 62 = 88 + 20 = 108
-    assert physical[108] == "00FF00"
-    # Inner: 150 + (45 + 4) % 46 = 150 + 3 = 153
-    assert physical[153] == "0000FF"
+    assert physical[(87 + workshop._OUTER_ROTATION) % 88] == "FF0000"
+    assert physical[88 + (61 + workshop._MIDDLE_ROTATION) % 62] == "00FF00"
+    assert physical[150 + (45 + workshop._INNER_ROTATION) % 46] == "0000FF"
 
 
 def test_apply_lamp_rotation_preserves_total_count():

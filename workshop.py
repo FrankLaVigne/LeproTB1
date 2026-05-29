@@ -131,8 +131,8 @@ _RING_SEGMENTS = {
 # different physical angle (outer/middle ~8 o'clock, inner ~11 o'clock).
 # Applied at the page↔protocol boundary in api_diy_paint and api_diy_save.
 # Tune these by ±1-3 if markers look off-center on the lamp.
-_OUTER_ROTATION = 29
-_MIDDLE_ROTATION = 21
+_OUTER_ROTATION = 31
+_MIDDLE_ROTATION = 22
 _INNER_ROTATION = 4
 
 
