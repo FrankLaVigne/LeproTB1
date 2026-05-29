@@ -398,3 +398,65 @@ async def test_run_interval_greater_than_5_uses_split_sleep(monkeypatch):
     assert 5 in sleeps, f"expected a sleep(5) for flash hold; sleeps = {sleeps}"
     # sleep(interval-5) = sleep(5) must also appear.
     assert sleeps.count(5) >= 2, f"expected two sleep(5) calls (hold + remaining); sleeps = {sleeps}"
+
+
+# --- is_ring_fast tests -------------------------------------------------------
+
+
+def test_is_ring_fast_needs_at_least_3_ticks():
+    # Fewer than 3 ticks -> never fast (insufficient signal).
+    assert ticker.is_ring_fast([]) is False
+    assert ticker.is_ring_fast([{"price": 100.0, "direction": "up"}]) is False
+    assert ticker.is_ring_fast([
+        {"price": 110.0, "direction": "up"},
+        {"price": 100.0, "direction": "up"},
+    ]) is False
+
+
+def test_is_ring_fast_all_up_with_big_enough_jump():
+    # 3 ticks, all up, 1% jump newest vs oldest -> fast.
+    ticks = [
+        {"price": 101.0, "direction": "up"},
+        {"price": 100.5, "direction": "up"},
+        {"price": 100.0, "direction": "up"},
+    ]
+    assert ticker.is_ring_fast(ticks) is True
+
+
+def test_is_ring_fast_all_down_with_big_enough_jump():
+    ticks = [
+        {"price": 99.0, "direction": "down"},
+        {"price": 99.5, "direction": "down"},
+        {"price": 100.0, "direction": "down"},
+    ]
+    assert ticker.is_ring_fast(ticks) is True
+
+
+def test_is_ring_fast_mixed_directions_never_fast():
+    # Even with large absolute move, mixed direction = not "fast".
+    ticks = [
+        {"price": 110.0, "direction": "up"},
+        {"price": 95.0,  "direction": "down"},
+        {"price": 100.0, "direction": "up"},
+    ]
+    assert ticker.is_ring_fast(ticks) is False
+
+
+def test_is_ring_fast_below_threshold_not_fast():
+    # All up, but only 0.1% over 3 ticks -> not fast.
+    ticks = [
+        {"price": 100.1, "direction": "up"},
+        {"price": 100.05, "direction": "up"},
+        {"price": 100.0, "direction": "up"},
+    ]
+    assert ticker.is_ring_fast(ticks) is False
+
+
+def test_is_ring_fast_ignores_baseline_and_error_ticks():
+    # Direction "baseline" or "error" doesn't count toward "all same direction".
+    ticks = [
+        {"price": 110.0, "direction": "up"},
+        {"price": 105.0, "direction": "up"},
+        {"price": 100.0, "direction": "baseline"},
+    ]
+    assert ticker.is_ring_fast(ticks) is False

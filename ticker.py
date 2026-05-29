@@ -40,6 +40,33 @@ def decide_ring_color(prev_price, now_price, prev_color):
     return new_color, ticked
 
 
+# Fast-mover detection: the % change between the oldest and newest of the
+# last FAST_WINDOW ticks must exceed FAST_THRESHOLD AND all FAST_WINDOW
+# ticks must be in the same direction ("up" or "down"). Calibrated for
+# 30-second polls: 0.5% over 3 polls = ~20%/hour pace.
+FAST_WINDOW = 3
+FAST_THRESHOLD = 0.005   # 0.5%
+
+
+def is_ring_fast(recent_ticks):
+    """Return True if the ring is in a sustained directional move.
+
+    ``recent_ticks`` is the newest-first list from TickerSession.snapshot();
+    each entry has ``price`` (float) and ``direction`` ("up"/"down"/...).
+    """
+    if len(recent_ticks) < FAST_WINDOW:
+        return False
+    window = recent_ticks[:FAST_WINDOW]
+    directions = {t["direction"] for t in window}
+    if directions != {"up"} and directions != {"down"}:
+        return False
+    newest = window[0]["price"]
+    oldest = window[-1]["price"]
+    if oldest == 0:
+        return False
+    return abs((newest - oldest) / oldest) >= FAST_THRESHOLD
+
+
 def build_ticker_d50(rings, flash_color):
     """Compose the d50 string for the lamp.
 
