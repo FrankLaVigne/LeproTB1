@@ -268,6 +268,23 @@ async def _run_preview(preset: dict, did: str, client) -> None:
         pass
 
 
+async def _stop_preview() -> None:
+    """Cancel and clear the preset preview loop, if running. Safe to call
+    when no preview is active. Used by power-off, ticker-start, clock-start,
+    and DIY paint to prevent the preview's per-frame writes from clobbering
+    the new state."""
+    global _preview_task, _preview_name
+    task = _preview_task
+    if task is not None and not task.done():
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
+    _preview_task = None
+    _preview_name = None
+
+
 logging.basicConfig(level=logging.INFO)
 _LOG = logging.getLogger("workshop")
 
@@ -370,6 +387,7 @@ def _render_shell(active: str, panel_html: str, title: str) -> str:
 # Module-level singletons set during lifespan startup.
 _client: LeproClient | None = None
 _preview_task: asyncio.Task | None = None
+_preview_name: "str | None" = None  # set by api_preview; read by api_cockpit_active
 
 
 def _load_preset(name: str) -> dict:
@@ -1323,7 +1341,7 @@ async def api_power(req):
 
 
 async def api_preview(req):
-    global _preview_task
+    global _preview_task, _preview_name
     try:
         body = await req.json()
         _check_ticker_mutex()
@@ -1341,6 +1359,7 @@ async def api_preview(req):
             except asyncio.CancelledError:
                 pass
         _preview_task = asyncio.create_task(_run_preview(recolored, did, _client))
+        _preview_name = recolored.get("name") or body.get("base_name") or "(unnamed)"
         return web.json_response({"ok": True})
     except web.HTTPConflict:
         raise
@@ -1573,6 +1592,41 @@ async def api_lamp_state(_req):
         "devices": dict(_client.state),
         "polled_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     })
+
+
+async def api_cockpit_active(_req):
+    """Return the active-mode banner data for the cockpit left panel.
+
+    Returns ``{mode, label}`` where mode is one of:
+      "off", "clock", "ticker", "preset", "idle"
+    and label is the formatted text shown in the banner.
+    """
+    # 1. Power off wins.
+    if _client is not None:
+        for fields in _client.state.values():
+            if fields.get("d1") == 0:
+                return web.json_response({"mode": "off", "label": "⏻ Off"})
+    # 2. Active background sessions.
+    if _clock_session is not None and _clock_session.running:
+        snap = _clock_session.snapshot()
+        now = (snap.get("now_displayed") or "")
+        suffix = now.split("T", 1)[1] if "T" in now else now
+        label = f"⏰ Clock — {suffix}" if suffix else "⏰ Clock"
+        return web.json_response({"mode": "clock", "label": label})
+    if _ticker_session is not None and _ticker_session.running:
+        snap = _ticker_session.snapshot()
+        syms = []
+        for ring in ("outer", "middle", "inner"):
+            r = (snap.get("rings") or {}).get(ring)
+            if r and r.get("symbol"):
+                syms.append(r["symbol"])
+        label = "\U0001F4C8 Ticker — " + ", ".join(syms) if syms else "\U0001F4C8 Ticker"
+        return web.json_response({"mode": "ticker", "label": label})
+    if _preview_task is not None and not _preview_task.done():
+        nm = _preview_name or "?"
+        return web.json_response({"mode": "preset", "label": f"\U0001F3A8 Preset — {nm}"})
+    # 3. On but nothing actively driving.
+    return web.json_response({"mode": "idle", "label": "✨ Idle"})
 
 
 # --- Clock endpoints ---------------------------------------------------------
@@ -2178,6 +2232,7 @@ def build_app() -> web.Application:
         web.post("/api/ticker/stop", api_ticker_stop),
         web.get("/api/ticker/state", api_ticker_state),
         web.get("/api/lamp/state", api_lamp_state),
+        web.get("/api/cockpit/active", api_cockpit_active),
         web.get("/clock", index_clock),
         web.post("/api/clock/start", api_clock_start),
         web.post("/api/clock/stop", api_clock_stop),

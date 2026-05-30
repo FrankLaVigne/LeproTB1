@@ -48,3 +48,47 @@ def test_render_shell_contains_left_panel_structure():
                  'id="brightness-slider"', 'id="brightness-val"',
                  'id="pwr-on"', 'id="pwr-off"', 'id="diag-body"'):
         assert hook in out, f"missing left-panel hook: {hook}"
+
+
+# --- _stop_preview helper -----------------------------------------------------
+
+
+import asyncio
+import pytest
+
+
+def test_stop_preview_when_no_task_does_nothing():
+    # Helper must be safe to call when there's no preview running.
+    workshop._preview_task = None
+    workshop._preview_name = None
+    asyncio.run(workshop._stop_preview())
+    assert workshop._preview_task is None
+    assert workshop._preview_name is None
+
+
+# --- api_cockpit_active -------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_cockpit_active_off_when_d1_zero():
+    workshop._client = type("C", (), {"state": {"abc": {"d1": 0}}})()
+    workshop._ticker_session = None
+    workshop._clock_session = None
+    workshop._preview_task = None
+    resp = await workshop.api_cockpit_active(None)
+    import json
+    body = json.loads(resp.body.decode("utf-8") if isinstance(resp.body, bytes) else resp.body)
+    assert body["mode"] == "off"
+
+
+@pytest.mark.asyncio
+async def test_cockpit_active_idle_when_d1_on_and_no_session():
+    workshop._client = type("C", (), {"state": {"abc": {"d1": 1}}})()
+    workshop._ticker_session = None
+    workshop._clock_session = None
+    workshop._preview_task = None
+    resp = await workshop.api_cockpit_active(None)
+    import json
+    body = json.loads(resp.body.decode("utf-8") if isinstance(resp.body, bytes) else resp.body)
+    assert body["mode"] == "idle"
+    assert "label" in body  # always non-null label for the banner
