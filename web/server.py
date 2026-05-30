@@ -414,117 +414,84 @@ async def index_diy(_req):
 
 
 async def index_ticker(_req):
-    return web.Response(text=_PAGE_TICKER, content_type="text/html")
+    return web.Response(text=_render_shell("ticker", _PANEL_TICKER, "Ticker"),
+                        content_type="text/html")
 
 
-# Real ticker UI inlined in Task 8.
-_PAGE_TICKER = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lepro Ticker</title>
+_PANEL_TICKER = """
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { font: 15px/1.4 system-ui, sans-serif; margin: 0;
-         background: #111; color: #eee; min-height: 100vh; }
-  .wrap { max-width: 540px; margin: 0 auto; padding: 16px; }
-  .header { display: flex; align-items: center; justify-content: space-between;
-            gap: 12px; margin-bottom: 12px; }
-  .tabs a { color: #aaa; text-decoration: none; padding: 6px 12px;
-            border-radius: 8px; font-weight: 600; }
-  .tabs a.active { color: #5fd9d9; background: #1f2a2a; }
-  .power-btns { display: flex; gap: 6px; }
-  .power-btns button { padding: 6px 12px; font-size: 13px; border: 0;
-                       border-radius: 8px; cursor: pointer; font-weight: 600; }
-  .power-btns button.on { background: #2c8f4f; color: #fff; }
-  .power-btns button.off { background: #8f2c2c; color: #fff; }
-  .card { background: #1c1c1f; padding: 14px; border-radius: 14px;
-          box-shadow: 0 4px 16px rgba(0,0,0,.4); margin-bottom: 14px; }
+  /* Feature-specific styles for the Ticker panel.
+     Generic page chrome lives in /static/cockpit.css.
+     Classes prefixed .ticker- to avoid collisions with other panels. */
+  .ticker-ring input[type=text] { width: 100%; padding: 10px 12px;
+                                   border-radius: 8px; background: #2a2a30;
+                                   color: #eee; border: 1px solid #333;
+                                   font: inherit; text-transform: uppercase; }
+  .ticker-ring input[type=text][readonly] { background: #1f1f23; color: #aaa; }
+  .ticker-price { font: 600 22px ui-monospace, monospace; margin: 10px 0 2px; }
+  .ticker-history { font: 12px ui-monospace, monospace; color: #999;
+                    margin-top: 6px; white-space: nowrap; overflow-x: auto; }
+  .ticker-intervals { display: flex; gap: 4px; background: #2a2a30;
+                      padding: 4px; border-radius: 8px; margin-bottom: 12px; }
+  .ticker-intervals button { flex: 1; padding: 6px 10px; border: 0;
+                              border-radius: 6px; background: transparent;
+                              color: #eee; cursor: pointer; font: inherit; }
+  .ticker-intervals button.active { background: #5fd9d9; color: #111; font-weight: 700; }
+  .ticker-intervals button:disabled { color: #555; cursor: not-allowed; }
+  .ticker-controls { display: flex; gap: 8px; }
+  .ticker-controls button { flex: 1; padding: 12px; border: 0; border-radius: 10px;
+                             background: #2a2a30; color: #eee; cursor: pointer;
+                             font: inherit; font-weight: 700; }
+  .ticker-controls button.primary { background: #2c8f4f; color: #fff; }
+  .ticker-controls button.danger { background: #8f2c2c; color: #fff; }
+  .ticker-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
   .ring-head { display: flex; justify-content: space-between; align-items: center;
                margin-bottom: 8px; }
   .ring-head h2 { font-size: 12px; margin: 0; color: #aaa;
                   text-transform: uppercase; letter-spacing: 0.08em; }
   .dot { width: 14px; height: 14px; border-radius: 50%;
          background: #333; border: 1px solid #444; }
-  .ring-card input[type=text] { width: 100%; padding: 10px 12px;
-                                 border-radius: 8px; background: #2a2a30;
-                                 color: #eee; border: 1px solid #333;
-                                 font: inherit; text-transform: uppercase; }
-  .ring-card input[type=text][readonly] { background: #1f1f23; color: #aaa; }
-  .price { font: 600 22px ui-monospace, monospace; margin: 10px 0 2px; }
   .meta { font-size: 12px; color: #888; }
-  .history { font: 12px ui-monospace, monospace; color: #999;
-             margin-top: 6px; white-space: nowrap; overflow-x: auto; }
-  .intervals { display: flex; gap: 4px; background: #2a2a30;
-               padding: 4px; border-radius: 8px; margin-bottom: 12px; }
-  .intervals button { flex: 1; padding: 6px 10px; border: 0;
-                      border-radius: 6px; background: transparent;
-                      color: #eee; cursor: pointer; font: inherit; }
-  .intervals button.active { background: #5fd9d9; color: #111; font-weight: 700; }
-  .intervals button:disabled { color: #555; cursor: not-allowed; }
-  .controls { display: flex; gap: 8px; }
-  .controls button { flex: 1; padding: 12px; border: 0; border-radius: 10px;
-                     background: #2a2a30; color: #eee; cursor: pointer;
-                     font: inherit; font-weight: 700; }
-  .controls button.primary { background: #2c8f4f; color: #fff; }
-  .controls button.danger { background: #8f2c2c; color: #fff; }
-  .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
-  #status { font-size: 12px; color: #777; margin-top: 10px; min-height: 1.2em; }
-</style></head>
-<body><div class="wrap">
-  <div class="header">
-    <div class="tabs">
-      <a href="/">&#x1F3A8; Presets</a>
-      <a href="/diy">&#x270F;&#xFE0F; DIY</a>
-      <a href="/ticker" class="active">&#x1F4C8; Ticker</a>
-      <a href="/state">&#x1F4CA; State</a>
-      <a href="/clock">&#x23F0; Clock</a>
-    </div>
-    <div class="power-btns">
-      <button class="on" id="pwr-on">On</button>
-      <button class="off" id="pwr-off">Off</button>
-    </div>
-  </div>
+</style>
 
-  <div class="card ring-card" data-ring="outer">
+  <div class="card ticker-ring" data-ring="outer">
     <div class="ring-head"><h2>Outer</h2><div class="dot"></div></div>
     <input type="text" placeholder="AAPL" maxlength="12">
-    <div class="price">&mdash;</div>
+    <div class="ticker-price">&mdash;</div>
     <div class="meta">no symbol</div>
-    <div class="history"></div>
+    <div class="ticker-history"></div>
   </div>
 
-  <div class="card ring-card" data-ring="middle">
+  <div class="card ticker-ring" data-ring="middle">
     <div class="ring-head"><h2>Middle</h2><div class="dot"></div></div>
     <input type="text" placeholder="IBM" maxlength="12">
-    <div class="price">&mdash;</div>
+    <div class="ticker-price">&mdash;</div>
     <div class="meta">no symbol</div>
-    <div class="history"></div>
+    <div class="ticker-history"></div>
   </div>
 
-  <div class="card ring-card" data-ring="inner">
+  <div class="card ticker-ring" data-ring="inner">
     <div class="ring-head"><h2>Inner</h2><div class="dot"></div></div>
     <input type="text" placeholder="SPY" maxlength="12">
-    <div class="price">&mdash;</div>
+    <div class="ticker-price">&mdash;</div>
     <div class="meta">no symbol</div>
-    <div class="history"></div>
+    <div class="ticker-history"></div>
   </div>
 
   <div class="card">
     <h2 style="margin:0 0 8px;font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.08em">Poll every</h2>
-    <div class="intervals" id="intervals">
+    <div class="ticker-intervals" id="intervals">
       <button data-interval="10">10s</button>
       <button data-interval="30" class="active">30s</button>
       <button data-interval="60">60s</button>
       <button data-interval="300">5m</button>
     </div>
-    <div class="controls">
+    <div class="ticker-controls">
       <button class="primary" id="start-btn">Start</button>
       <button class="danger" id="stop-btn" disabled>Stop</button>
     </div>
     <div id="status">not running</div>
   </div>
-</div>
 
 <script type="module">
 const $ = s => document.querySelector(s);
@@ -544,7 +511,7 @@ for (const b of $$('#intervals button')) {
 }
 
 function setInputsReadonly(ro) {
-  for (const inp of $$('.ring-card input[type=text]')) inp.readOnly = ro;
+  for (const inp of $$('.ticker-ring input[type=text]')) inp.readOnly = ro;
   for (const b of $$('#intervals button')) b.disabled = ro;
 }
 
@@ -583,11 +550,11 @@ function timeAgo(iso) {
 }
 
 function renderRing(ring, data) {
-  const card = $(`.ring-card[data-ring="${ring}"]`);
+  const card = $(`.ticker-ring[data-ring="${ring}"]`);
   const dot = card.querySelector('.dot');
-  const price = card.querySelector('.price');
+  const price = card.querySelector('.ticker-price');
   const meta = card.querySelector('.meta');
-  const history = card.querySelector('.history');
+  const history = card.querySelector('.ticker-history');
   const input = card.querySelector('input');
 
   if (!data) {
@@ -636,7 +603,7 @@ async function refresh() {
 
 $('#start-btn').onclick = async () => {
   const body = {interval: state.interval};
-  for (const card of $$('.ring-card')) {
+  for (const card of $$('.ticker-ring')) {
     const sym = card.querySelector('input').value.trim();
     if (sym) body[card.dataset.ring] = sym;
   }
@@ -653,12 +620,11 @@ $('#stop-btn').onclick = async () => {
   await postJSON('/api/ticker/stop', {});
   await refresh();
 };
-$('#pwr-on').onclick = () => postJSON('/api/power', {on: true});
-$('#pwr-off').onclick = () => postJSON('/api/power', {on: false});
 
 refresh();
 setInterval(refresh, 5000);
-</script></body></html>"""
+</script>
+"""
 
 
 _PAGE_STATE = """<!doctype html>
