@@ -365,6 +365,7 @@ _PAGE_TICKER = """<!doctype html>
       <a href="/diy">&#x270F;&#xFE0F; DIY</a>
       <a href="/ticker" class="active">&#x1F4C8; Ticker</a>
       <a href="/state">&#x1F4CA; State</a>
+      <a href="/clock">&#x23F0; Clock</a>
     </div>
     <div class="power-btns">
       <button class="on" id="pwr-on">On</button>
@@ -601,6 +602,7 @@ _PAGE_STATE = """<!doctype html>
       <a href="/diy">&#x270F;&#xFE0F; DIY</a>
       <a href="/ticker">&#x1F4C8; Ticker</a>
       <a href="/state" class="active">&#x1F4CA; State</a>
+      <a href="/clock">&#x23F0; Clock</a>
     </div>
   </div>
 
@@ -879,6 +881,7 @@ _PAGE_DIY = """<!doctype html>
       <a href="/diy" class="active">&#x270F;&#xFE0F; DIY</a>
       <a href="/ticker">&#x1F4C8; Ticker</a>
       <a href="/state">&#x1F4CA; State</a>
+      <a href="/clock">&#x23F0; Clock</a>
     </div>
     <div class="power-btns">
       <button class="on" id="pwr-on">&#x23FB; On</button>
@@ -1542,7 +1545,283 @@ async def index_clock(_req):
 
 
 # Real clock UI inlined in Task 7.
-_PAGE_CLOCK = "<!doctype html><title>clock</title><body>clock loading...</body>"
+_PAGE_CLOCK = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lepro Clock</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 0;
+         background: #111; color: #eee; min-height: 100vh; }
+  .wrap { max-width: 540px; margin: 0 auto; padding: 16px; }
+  .header { display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; margin-bottom: 12px; }
+  .tabs a { color: #aaa; text-decoration: none; padding: 6px 12px;
+            border-radius: 8px; font-weight: 600; }
+  .tabs a.active { color: #5fd9d9; background: #1f2a2a; }
+  .power-btns { display: flex; gap: 6px; }
+  .power-btns button { padding: 6px 12px; font-size: 13px; border: 0;
+                       border-radius: 8px; cursor: pointer; font-weight: 600; }
+  .power-btns button.on { background: #2c8f4f; color: #fff; }
+  .power-btns button.off { background: #8f2c2c; color: #fff; }
+  .card { background: #1c1c1f; padding: 14px; border-radius: 14px;
+          box-shadow: 0 4px 16px rgba(0,0,0,.4); margin-bottom: 14px; }
+  .lamp-canvas { display: flex; justify-content: center; padding: 6px 0; }
+  h2 { font-size: 12px; margin: 0 0 8px; color: #aaa;
+       text-transform: uppercase; letter-spacing: 0.08em; }
+  .color-row { display: grid; grid-template-columns: 90px 50px 1fr;
+               align-items: center; gap: 10px; margin: 8px 0; }
+  .color-row label { font-size: 13px; color: #ccc; }
+  .color-row input[type=color] { width: 44px; height: 32px;
+                                  border: 2px solid #333; border-radius: 8px;
+                                  cursor: pointer; background: none; padding: 0; }
+  .color-row .hex { font: 12px ui-monospace, monospace; color: #888; }
+  .mode-toggle { display: flex; gap: 4px; background: #2a2a30;
+                 padding: 4px; border-radius: 8px; max-width: 180px; }
+  .mode-toggle button { flex: 1; padding: 6px 12px; border: 0;
+                        border-radius: 6px; background: transparent;
+                        color: #eee; cursor: pointer; font: inherit; }
+  .mode-toggle button.active { background: #5fd9d9; color: #111; font-weight: 700; }
+  .controls { display: flex; gap: 8px; margin-top: 8px; }
+  .controls button { flex: 1; padding: 12px; border: 0; border-radius: 10px;
+                     background: #2a2a30; color: #eee; cursor: pointer;
+                     font: inherit; font-weight: 700; }
+  .controls button.primary { background: #2c8f4f; color: #fff; }
+  .controls button.danger { background: #8f2c2c; color: #fff; }
+  .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #status { font-size: 12px; color: #777; margin-top: 10px; min-height: 1.2em; }
+  .clock-readout { font: 600 28px ui-monospace, monospace;
+                   text-align: center; color: #eee; margin: 4px 0 10px; }
+</style></head>
+<body><div class="wrap">
+  <div class="header">
+    <div class="tabs">
+      <a href="/">&#x1F3A8; Presets</a>
+      <a href="/diy">&#x270F;&#xFE0F; DIY</a>
+      <a href="/ticker">&#x1F4C8; Ticker</a>
+      <a href="/state">&#x1F4CA; State</a>
+      <a href="/clock" class="active">&#x23F0; Clock</a>
+    </div>
+    <div class="power-btns">
+      <button class="on" id="pwr-on">On</button>
+      <button class="off" id="pwr-off">Off</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="clock-readout" id="readout">--:--:--</div>
+    <div class="lamp-canvas">
+      <svg id="lamp" width="380" height="380" viewBox="-200 -200 400 400"></svg>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Colors</h2>
+    <div class="color-row">
+      <label>Outer (seconds)</label>
+      <input type="color" id="color-outer" value="#FF0000">
+      <div class="hex" id="hex-outer">FF0000</div>
+    </div>
+    <div class="color-row">
+      <label>Middle (minutes)</label>
+      <input type="color" id="color-middle" value="#00FF00">
+      <div class="hex" id="hex-middle">00FF00</div>
+    </div>
+    <div class="color-row">
+      <label>Inner (hours)</label>
+      <input type="color" id="color-inner" value="#0000FF">
+      <div class="hex" id="hex-inner">0000FF</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Hour format</h2>
+    <div class="mode-toggle" id="mode-toggle">
+      <button data-mode="12h" class="active">12h</button>
+      <button data-mode="24h">24h</button>
+    </div>
+    <div class="controls">
+      <button class="primary" id="start-btn">Start</button>
+      <button class="danger" id="stop-btn" disabled>Stop</button>
+    </div>
+    <div id="status">not running</div>
+  </div>
+</div>
+
+<script type="module">
+import { computeClockPositions } from '/static/lamp-utils.js';
+
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+const OUTER = Array.from({length:22}, (_,i) => [i*4, i*4+4]);
+const MIDDLE = [
+  ...Array.from({length:13}, (_,i) => [88+i*4, 88+i*4+4]),
+  [140,145], [145,150],
+];
+const INNER = [
+  ...Array.from({length:9}, (_,i) => [150+i*4, 150+i*4+4]),
+  [186,191], [191,196],
+];
+const RING_GEOMETRY = {
+  outer:  {r0: 130, r1: 180},
+  middle: {r0: 90,  r1: 125},
+  inner:  {r0: 50,  r1: 85},
+};
+
+const state = {
+  colors: {outer: 'FF0000', middle: '00FF00', inner: '0000FF'},
+  mode: '12h',
+  running: false,
+};
+
+function arcPath(r0, r1, a0, a1) {
+  const toXY = (r, a) => [r*Math.cos(a), r*Math.sin(a)];
+  const [x0a, y0a] = toXY(r0, a0);
+  const [x1a, y1a] = toXY(r1, a0);
+  const [x1b, y1b] = toXY(r1, a1);
+  const [x0b, y0b] = toXY(r0, a1);
+  const large = (a1 - a0) > Math.PI ? 1 : 0;
+  return `M${x0a},${y0a} L${x1a},${y1a} A${r1},${r1} 0 ${large} 1 ${x1b},${y1b}`
+       + ` L${x0b},${y0b} A${r0},${r0} 0 ${large} 0 ${x0a},${y0a} Z`;
+}
+
+function segmentsContaining(ring, ledIdx) {
+  const segs = ring === 'outer' ? OUTER : ring === 'middle' ? MIDDLE : INNER;
+  const base = ring === 'outer' ? 0 : ring === 'middle' ? 88 : 150;
+  const absIdx = base + ledIdx;
+  for (let i = 0; i < segs.length; i++) {
+    if (absIdx >= segs[i][0] && absIdx < segs[i][1]) return i;
+  }
+  return null;
+}
+
+function drawClock(positions) {
+  const svg = $('#lamp');
+  svg.innerHTML = '';
+  for (const [name, segs] of [['outer', OUTER], ['middle', MIDDLE], ['inner', INNER]]) {
+    const g = RING_GEOMETRY[name];
+    const total = segs.length;
+    const litSegmentIdx = segmentsContaining(name, positions[name]);
+    for (let i = 0; i < total; i++) {
+      const a0 = (i / total) * 2 * Math.PI - Math.PI / 2;
+      const a1 = ((i + 1) / total) * 2 * Math.PI - Math.PI / 2;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', arcPath(g.r0, g.r1, a0, a1));
+      const lit = i === litSegmentIdx;
+      const color = lit ? '#' + state.colors[name] : '#000';
+      path.setAttribute('fill', color);
+      path.setAttribute('stroke', '#1c1c1f');
+      path.setAttribute('stroke-width', '1');
+      svg.appendChild(path);
+    }
+  }
+}
+
+function updateReadout(now) {
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  $('#readout').textContent = `${hh}:${mm}:${ss}`;
+}
+
+function tickVisualizer() {
+  const now = new Date();
+  const positions = computeClockPositions(now, state.mode);
+  drawClock(positions);
+  updateReadout(now);
+}
+
+async function postJSON(path, body) {
+  const opts = {method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body || {})};
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+function syncColorPickers() {
+  for (const ring of ['outer', 'middle', 'inner']) {
+    $(`#color-${ring}`).value = '#' + state.colors[ring];
+    $(`#hex-${ring}`).textContent = state.colors[ring];
+  }
+}
+
+function syncModeToggle() {
+  for (const b of $$('#mode-toggle button')) {
+    b.classList.toggle('active', b.dataset.mode === state.mode);
+  }
+}
+
+function setInputsDisabled(disabled) {
+  for (const ring of ['outer', 'middle', 'inner']) {
+    $(`#color-${ring}`).disabled = disabled;
+  }
+  for (const b of $$('#mode-toggle button')) b.disabled = disabled;
+  $('#start-btn').disabled = disabled;
+  $('#stop-btn').disabled = !disabled;
+}
+
+for (const ring of ['outer', 'middle', 'inner']) {
+  $(`#color-${ring}`).oninput = e => {
+    if (state.running) return;
+    state.colors[ring] = e.target.value.replace('#', '').toUpperCase();
+    $(`#hex-${ring}`).textContent = state.colors[ring];
+  };
+}
+for (const b of $$('#mode-toggle button')) {
+  b.onclick = () => {
+    if (state.running) return;
+    state.mode = b.dataset.mode;
+    syncModeToggle();
+  };
+}
+
+$('#start-btn').onclick = async () => {
+  const j = await postJSON('/api/clock/start', {colors: state.colors, mode: state.mode});
+  if (!j.ok) { $('#status').textContent = 'error: ' + j.error; return; }
+  state.running = true;
+  setInputsDisabled(true);
+  $('#status').textContent = 'running since ' + (j.since ? j.since.slice(11, 16) : '?');
+};
+$('#stop-btn').onclick = async () => {
+  await postJSON('/api/clock/stop', {});
+  state.running = false;
+  setInputsDisabled(false);
+  $('#status').textContent = 'stopped (last frame left on lamp)';
+};
+$('#pwr-on').onclick = () => postJSON('/api/power', {on: true});
+$('#pwr-off').onclick = () => postJSON('/api/power', {on: false});
+
+async function refreshFromServer() {
+  try {
+    const j = await fetch('/api/clock/state').then(r => r.json());
+    if (j.running) {
+      state.running = true;
+      if (j.colors) state.colors = j.colors;
+      if (j.mode) state.mode = j.mode;
+      syncColorPickers();
+      syncModeToggle();
+      setInputsDisabled(true);
+      $('#status').textContent = 'running since ' + (j.since ? j.since.slice(11, 16) : '?');
+    } else {
+      state.running = false;
+      setInputsDisabled(false);
+      if ($('#status').textContent === '' || $('#status').textContent === 'not running') {
+        $('#status').textContent = 'not running';
+      }
+    }
+  } catch (e) { /* silent */ }
+}
+
+syncColorPickers();
+syncModeToggle();
+tickVisualizer();
+setInterval(tickVisualizer, 1000);
+refreshFromServer();
+setInterval(refreshFromServer, 5000);
+</script></body></html>"""
 
 
 async def index_state(_req):
@@ -1616,6 +1895,7 @@ _PAGE = """<!doctype html>
         <a href="/diy" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">✏️ DIY</a>
         <a href="/ticker" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">📈 Ticker</a>
         <a href="/state" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">📊 State</a>
+        <a href="/clock" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">⏰ Clock</a>
       </div>
       <div class="power-btns">
         <button class="on" id="pwr-on">⏻ On</button>
