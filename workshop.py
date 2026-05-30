@@ -1208,7 +1208,7 @@ async def api_power(req):
     as /api/ticker/stop") so the next poll cannot re-assert d50 and silently
     undo the user's power-off. Power-on leaves the ticker state unchanged.
     """
-    global _ticker_session
+    global _ticker_session, _clock_session
     try:
         body = await req.json()
         on = bool(body.get("on"))
@@ -1217,6 +1217,9 @@ async def api_power(req):
             if _ticker_session is not None and _ticker_session.running:
                 await _ticker_session.stop()
                 _ticker_session = None
+            if _clock_session is not None and _clock_session.running:
+                await _clock_session.stop()
+                _clock_session = None
         await _client.power(on)
         return web.json_response({"ok": True, "on": on})
     except (LeproError, ValueError, KeyError) as e:
@@ -1228,6 +1231,7 @@ async def api_preview(req):
     try:
         body = await req.json()
         _check_ticker_mutex()
+        _check_clock_mutex()
         base_name = body["base_name"]
         color_map = body.get("color_map") or {}
         preset = _load_preset(base_name)
@@ -1249,11 +1253,14 @@ async def api_preview(req):
 
 
 async def api_stop(_req):
-    global _preview_task, _ticker_session
+    global _preview_task, _ticker_session, _clock_session
     # Spec: POST /api/stop is a "stop everything" gesture — stop the ticker too.
     if _ticker_session is not None and _ticker_session.running:
         await _ticker_session.stop()
         _ticker_session = None
+    if _clock_session is not None and _clock_session.running:
+        await _clock_session.stop()
+        _clock_session = None
     if _preview_task and not _preview_task.done():
         _preview_task.cancel()
         try:
@@ -1309,6 +1316,7 @@ async def api_diy_paint(req):
     try:
         body = await req.json()
         _check_ticker_mutex()
+        _check_clock_mutex()
         leds = body["leds"]
         effect = body.get("effect", "Steady")
         speed = int(body.get("speed", 50))
@@ -1469,6 +1477,72 @@ async def api_lamp_state(_req):
         "devices": dict(_client.state),
         "polled_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     })
+
+
+# --- Clock endpoints ---------------------------------------------------------
+
+import clock as _clock_mod
+
+_clock_session = None  # type: ignore[assignment]
+
+
+def _check_clock_mutex():
+    """Raise web.HTTPConflict if the clock is running."""
+    global _clock_session
+    if _clock_session is not None and _clock_session.running:
+        raise web.HTTPConflict(
+            text='{"ok": false, "error": "clock is running; stop it first"}',
+            content_type="application/json",
+        )
+
+
+async def api_clock_start(req):
+    global _clock_session
+    try:
+        body = await req.json()
+        colors = body.get("colors") or {}
+        mode = body.get("mode", "12h")
+        if _clock_session is not None and _clock_session.running:
+            return web.json_response(
+                {"ok": False, "error": "clock already running"}, status=409)
+        # Ticker mutex too — only one lamp-driving session at a time.
+        if _ticker_session is not None and _ticker_session.running:
+            return web.json_response(
+                {"ok": False, "error": "stock ticker is running; stop it first"},
+                status=409)
+        sess = _clock_mod.ClockSession(_client, colors=colors, mode=mode)
+        await sess.start()
+        _clock_session = sess
+        snap = sess.snapshot()
+        return web.json_response({"ok": True, "since": snap["since"], "mode": snap["mode"]})
+    except (ValueError, KeyError, TypeError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+async def api_clock_stop(_req):
+    global _clock_session
+    if _clock_session is None:
+        return web.json_response({"ok": True})
+    await _clock_session.stop()
+    _clock_session = None
+    return web.json_response({"ok": True})
+
+
+async def api_clock_state(_req):
+    if _clock_session is None:
+        return web.json_response({
+            "running": False, "since": None, "mode": None,
+            "colors": None, "now_displayed": None,
+        })
+    return web.json_response(_clock_session.snapshot())
+
+
+async def index_clock(_req):
+    return web.Response(text=_PAGE_CLOCK, content_type="text/html")
+
+
+# Real clock UI inlined in Task 7.
+_PAGE_CLOCK = "<!doctype html><title>clock</title><body>clock loading...</body>"
 
 
 async def index_state(_req):
@@ -1731,6 +1805,10 @@ def build_app() -> web.Application:
         web.post("/api/ticker/stop", api_ticker_stop),
         web.get("/api/ticker/state", api_ticker_state),
         web.get("/api/lamp/state", api_lamp_state),
+        web.get("/clock", index_clock),
+        web.post("/api/clock/start", api_clock_start),
+        web.post("/api/clock/stop", api_clock_stop),
+        web.get("/api/clock/state", api_clock_state),
     ])
     # Static assets — currently just lamp-utils.js shared by /diy and /state.
     app.router.add_static("/static", _HERE / "static")
