@@ -138,57 +138,46 @@ In short: pulse means "something is moving"; solid green/red means "calm";
 yellow means "I can't see the price right now"; the color tells you the
 most recent direction (or the failure state).
 
-## Preset workshop
-
-A web UI for browsing the captured preset library, recoloring a chosen preset
-via a color-combo picker, naming the variant, previewing it on the lamp, and
-saving the result as a new `presets/*.json`.
+## Web UI (cockpit)
 
 ```bash
 .venv/bin/python -m web.server        # serves on 0.0.0.0:8081
 ```
 
-Open `http://<vm-ip>:8081` in a browser. Left column lists every preset with a
-palette preview; click one to load it as the base. Right column has a Variant
-name input, a Color Combo (N round swatches matching the base's distinct
-palette colors — click each to pick a new hex), and disabled Speed / Brightness
-sliders (decode pending — see `docs/D50_FORMAT.md`). Preview pushes the recolored
-animation to the lamp live; Save writes a new file under `presets/`.
+Open `http://<vm-ip>:8081`. The interface is a single "cockpit" layout:
 
-LAN-only — no auth. Override the bind address with `LEPRO_WORKSHOP_HOST` /
-`LEPRO_WORKSHOP_PORT`. Coexists with the MCP server (8765).
+- **Left panel (always visible):** the lamp visualizer (live 3-ring SVG of
+  what the lamp is currently showing), the active-mode banner (Idle / Off /
+  Preset / Ticker / Clock), power on/off, brightness slider (0-100 %), and
+  a collapsible diagnostics drawer with the raw d-field values.
+- **Right panel:** four tabs.
+  - **🎨 Presets** — browse / recolor / preview / save captured presets
+    (`presets/*.json`). Click Preview to loop the preset on the lamp.
+  - **✏️ DIY** — click-to-paint 3-ring SVG canvas; Draw / Fill / Erase /
+    Back tools; color picker with quick-pick swatches; six confirmed motion
+    effects (Steady / Breathe / Gradient / Leftward / Rightward / Circle);
+    speed slider; Save to a single-frame preset.
+  - **📈 Ticker** — assign up to 3 Yahoo Finance symbols to the rings;
+    each ring shows its symbol's most recent direction as a solid color,
+    with a 5-second whole-lamp breathe flash on every tick. Sustained
+    moves earn a ⚡ FAST badge and switch the base effect to Breathe.
+  - **⏰ Clock** — three-handed analog clock (outer = seconds, middle =
+    minutes, inner = hours), per-ring configurable colors, 12 h / 24 h
+    toggle, 1-second cadence.
 
-The workshop now also includes a **DIY editor** at `http://<vm-ip>:8081/diy`,
-mimicking the Lepro app's DIY screen — a clickable 3-ring SVG canvas (48 app-
-matched segments or 196 per-LED resolution via toggle), Draw/Fill/Erase/Back
-tools, color picker with quick-pick swatches, the six confirmed motion effects
-(Steady/Breathe/Gradient/Leftward/Rightward/Circle), speed and brightness
-sliders, and Save (which writes a single-frame preset into `presets/`). Every
-stroke updates the lamp live via the cloud, with client-side 100 ms throttling
-to coalesce drag movements.
+While the ticker or clock is running, the DIY paint and the Presets-page
+preview endpoint return HTTP 409. Power off stops every active driver
+(ticker, clock, preset preview) before turning the lamp off. Starting
+the ticker or clock — or sending a DIY paint — auto-stops the preset
+preview loop so manual paints aren't overwritten.
 
-A **Stock Ticker** page is available at `http://<vm-ip>:8081/ticker` — assign up
-to three Yahoo Finance symbols (one per concentric ring), pick a poll interval
-(10s / 30s / 60s / 5m), and Start. Each ring shows its symbol's most recent
-direction as a solid color (green ↑, red ↓, yellow on fetch failure, white
-baseline, off if no symbol), and every tick triggers a 5-second whole-lamp
-breathe flash in the new color. Stop powers the lamp off. While the ticker is
-running, the DIY paint endpoint and the workshop preview endpoint return HTTP
-409 — power, brightness, and saves stay available. When any ring is in a
-sustained directional move (3 consecutive same-direction ticks totalling ≥
-0.5%), it earns a **⚡ FAST** badge in the page and the whole lamp switches from
-Steady to Breathe (per-ring colors still visible) until the streak ends.
+Responsive layout: side-by-side cockpit on desktop (≥ 720 px), stacked
+on phone. LAN-only — no auth. Override the bind address with
+`LEPRO_WORKSHOP_HOST` / `LEPRO_WORKSHOP_PORT`.
 
-A **Clock** page is available at `http://<vm-ip>:8081/clock` — turns the lamp
-into a three-handed analog clock with the outer ring showing seconds (88
-LEDs), middle showing minutes (62), and inner showing hours (46). One bright
-LED per ring marks the current position, drifting smoothly between marks as
-the next-finer unit ticks. Per-ring colors are configurable from the page
-(default: red seconds / green minutes / blue hours); the hour ring has a
-12h / 24h toggle. Updates every second. Like the ticker, while the clock is
-running the DIY paint and workshop preview endpoints return HTTP 409;
-brightness and saves stay available. Stop leaves the last frame on the lamp
-(use the power button to turn it off).
+`/state` (the old standalone state page) is gone — it was absorbed into
+the left panel. The URL 302-redirects to `/` so old bookmarks still land
+somewhere useful.
 
 ## Protocol notes
 

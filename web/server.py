@@ -1013,6 +1013,7 @@ async def api_power(req):
             if _clock_session is not None and _clock_session.running:
                 await _clock_session.stop()
                 _clock_session = None
+            await _stop_preview()
         await _client.power(on)
         return web.json_response({"ok": True, "on": on})
     except (LeproError, ValueError, KeyError) as e:
@@ -1111,6 +1112,7 @@ async def api_diy_paint(req):
         body = await req.json()
         _check_ticker_mutex()
         _check_clock_mutex()
+        await _stop_preview()
         leds = body["leds"]
         effect = body.get("effect", "Steady")
         speed = int(body.get("speed", 50))
@@ -1225,6 +1227,7 @@ async def api_ticker_start(req):
                 {"ok": False, "error": f"could not fetch first price for: {', '.join(failed)}"},
                 status=400,
             )
+        await _stop_preview()
         sess = _ticker_mod.TickerSession(_client, symbols, interval)
         for ring, price in baselines.items():
             sess.set_baseline(ring, price)
@@ -1339,6 +1342,7 @@ async def api_clock_start(req):
             return web.json_response(
                 {"ok": False, "error": "stock ticker is running; stop it first"},
                 status=409)
+        await _stop_preview()
         sess = _clock_mod.ClockSession(_client, colors=colors, mode=mode)
         await sess.start()
         _clock_session = sess

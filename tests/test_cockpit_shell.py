@@ -103,3 +103,28 @@ async def test_state_route_redirects_to_root():
     with pytest.raises(_web.HTTPFound) as exc:
         await workshop.index_state_redirect(None)
     assert exc.value.location == "/"
+
+
+# --- preview auto-stop integration -------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_stop_preview_cancels_running_task():
+    """Helper actually cancels a running task and clears the name."""
+    async def _loop():
+        try:
+            while True:
+                await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            raise
+
+    workshop._preview_task = asyncio.create_task(_loop())
+    workshop._preview_name = "fake"
+    # Give the task time to actually start.
+    await asyncio.sleep(0)
+    assert workshop._preview_task is not None
+    assert workshop._preview_task.done() is False
+
+    await workshop._stop_preview()
+    assert workshop._preview_task is None
+    assert workshop._preview_name is None
