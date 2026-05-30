@@ -69,3 +69,48 @@ def test_compute_positions_wraps_mod_ring_size():
     assert 0 <= pos["outer"] < 88
     assert 0 <= pos["middle"] < 62
     assert 0 <= pos["inner"] < 46
+
+
+# --- build_clock_leds tests ---------------------------------------------------
+
+
+def _colors(outer="FF0000", middle="00FF00", inner="0000FF"):
+    return {"outer": outer, "middle": middle, "inner": inner}
+
+
+def test_build_clock_leds_paints_exactly_three_lit_leds():
+    positions = {"outer": 0, "middle": 0, "inner": 0}
+    leds = clock.build_clock_leds(positions, _colors())
+    assert len(leds) == 196
+    lit = [(i, c) for i, c in enumerate(leds) if c is not None]
+    assert len(lit) == 3
+
+
+def test_build_clock_leds_uses_correct_colors_at_correct_indices():
+    positions = {"outer": 5, "middle": 7, "inner": 9}
+    leds = clock.build_clock_leds(positions, _colors())
+    # Outer ring covers indices 0..87, middle 88..149, inner 150..195.
+    assert leds[5] == "FF0000"
+    assert leds[88 + 7] == "00FF00"
+    assert leds[150 + 9] == "0000FF"
+    # And everything else is None (off).
+    other = [c for i, c in enumerate(leds)
+             if i not in (5, 88 + 7, 150 + 9)]
+    assert all(c is None for c in other)
+
+
+def test_build_clock_leds_supports_zero_positions():
+    positions = {"outer": 0, "middle": 0, "inner": 0}
+    leds = clock.build_clock_leds(positions, _colors())
+    assert leds[0] == "FF0000"
+    assert leds[88] == "00FF00"
+    assert leds[150] == "0000FF"
+
+
+def test_build_clock_leds_supports_last_positions():
+    # outer max = 87, middle max = 61, inner max = 45
+    positions = {"outer": 87, "middle": 61, "inner": 45}
+    leds = clock.build_clock_leds(positions, _colors())
+    assert leds[87] == "FF0000"
+    assert leds[149] == "00FF00"
+    assert leds[195] == "0000FF"

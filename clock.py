@@ -40,3 +40,18 @@ def compute_positions(now: datetime, mode: str = "12h") -> dict:
     inner = round(hour_unit * 46 / hours_per_cycle) % 46
 
     return {"outer": outer, "middle": middle, "inner": inner}
+
+
+def build_clock_leds(positions: dict, colors: dict) -> list:
+    """Return a 196-entry page-space LED array with one dot per ring.
+
+    Positions are 0-indexed within each ring (outer 0..87, middle 0..61,
+    inner 0..45). The caller is responsible for applying the lamp
+    rotation and encoding via ``workshop.build_d50_from_leds`` before
+    sending. Returns a fresh list (callers may mutate).
+    """
+    leds = [None] * 196
+    leds[positions["outer"]] = colors["outer"]
+    leds[88 + positions["middle"]] = colors["middle"]
+    leds[150 + positions["inner"]] = colors["inner"]
+    return leds
