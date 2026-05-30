@@ -1626,94 +1626,61 @@ async def api_clock_state(_req):
 
 
 async def index_clock(_req):
-    return web.Response(text=_PAGE_CLOCK, content_type="text/html")
+    return web.Response(text=_render_shell("clock", _PANEL_CLOCK, "Clock"),
+                        content_type="text/html")
 
 
-# Real clock UI inlined in Task 7.
-_PAGE_CLOCK = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lepro Clock</title>
+_PANEL_CLOCK = """
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { font: 15px/1.4 system-ui, sans-serif; margin: 0;
-         background: #111; color: #eee; min-height: 100vh; }
-  .wrap { max-width: 540px; margin: 0 auto; padding: 16px; }
-  .header { display: flex; align-items: center; justify-content: space-between;
-            gap: 12px; margin-bottom: 12px; }
-  .tabs a { color: #aaa; text-decoration: none; padding: 6px 12px;
-            border-radius: 8px; font-weight: 600; }
-  .tabs a.active { color: #5fd9d9; background: #1f2a2a; }
-  .power-btns { display: flex; gap: 6px; }
-  .power-btns button { padding: 6px 12px; font-size: 13px; border: 0;
-                       border-radius: 8px; cursor: pointer; font-weight: 600; }
-  .power-btns button.on { background: #2c8f4f; color: #fff; }
-  .power-btns button.off { background: #8f2c2c; color: #fff; }
-  .card { background: #1c1c1f; padding: 14px; border-radius: 14px;
-          box-shadow: 0 4px 16px rgba(0,0,0,.4); margin-bottom: 14px; }
-  .lamp-canvas { display: flex; justify-content: center; padding: 6px 0; }
-  h2 { font-size: 12px; margin: 0 0 8px; color: #aaa;
-       text-transform: uppercase; letter-spacing: 0.08em; }
-  .color-row { display: grid; grid-template-columns: 90px 50px 1fr;
-               align-items: center; gap: 10px; margin: 8px 0; }
-  .color-row label { font-size: 13px; color: #ccc; }
-  .color-row input[type=color] { width: 44px; height: 32px;
-                                  border: 2px solid #333; border-radius: 8px;
-                                  cursor: pointer; background: none; padding: 0; }
-  .color-row .hex { font: 12px ui-monospace, monospace; color: #888; }
-  .mode-toggle { display: flex; gap: 4px; background: #2a2a30;
-                 padding: 4px; border-radius: 8px; max-width: 180px; }
-  .mode-toggle button { flex: 1; padding: 6px 12px; border: 0;
-                        border-radius: 6px; background: transparent;
-                        color: #eee; cursor: pointer; font: inherit; }
-  .mode-toggle button.active { background: #5fd9d9; color: #111; font-weight: 700; }
-  .controls { display: flex; gap: 8px; margin-top: 8px; }
-  .controls button { flex: 1; padding: 12px; border: 0; border-radius: 10px;
-                     background: #2a2a30; color: #eee; cursor: pointer;
-                     font: inherit; font-weight: 700; }
-  .controls button.primary { background: #2c8f4f; color: #fff; }
-  .controls button.danger { background: #8f2c2c; color: #fff; }
-  .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
-  #status { font-size: 12px; color: #777; margin-top: 10px; min-height: 1.2em; }
+  /* Feature-specific styles for the Clock panel.
+     Generic page chrome lives in /static/cockpit.css.
+     Classes prefixed .clock- to avoid collisions with other panels. */
+  .clock-canvas { display: flex; justify-content: center; padding: 6px 0; }
+  .clock-color-row { display: grid; grid-template-columns: 90px 50px 1fr;
+                     align-items: center; gap: 10px; margin: 8px 0; }
+  .clock-color-row label { font-size: 13px; color: #ccc; }
+  .clock-color-row input[type=color] { width: 44px; height: 32px;
+                                        border: 2px solid #333; border-radius: 8px;
+                                        cursor: pointer; background: none; padding: 0; }
+  .clock-color-row .hex { font: 12px ui-monospace, monospace; color: #888; }
+  .clock-mode-toggle { display: flex; gap: 4px; background: #2a2a30;
+                       padding: 4px; border-radius: 8px; max-width: 180px; }
+  .clock-mode-toggle button { flex: 1; padding: 6px 12px; border: 0;
+                               border-radius: 6px; background: transparent;
+                               color: #eee; cursor: pointer; font: inherit; }
+  .clock-mode-toggle button.active { background: #5fd9d9; color: #111; font-weight: 700; }
+  .clock-controls { display: flex; gap: 8px; margin-top: 8px; }
+  .clock-controls button { flex: 1; padding: 12px; border: 0; border-radius: 10px;
+                            background: #2a2a30; color: #eee; cursor: pointer;
+                            font: inherit; font-weight: 700; }
+  .clock-controls button.primary { background: #2c8f4f; color: #fff; }
+  .clock-controls button.danger { background: #8f2c2c; color: #fff; }
+  .clock-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #clock-status { font-size: 12px; color: #777; margin-top: 10px; min-height: 1.2em; }
   .clock-readout { font: 600 28px ui-monospace, monospace;
                    text-align: center; color: #eee; margin: 4px 0 10px; }
-</style></head>
-<body><div class="wrap">
-  <div class="header">
-    <div class="tabs">
-      <a href="/">&#x1F3A8; Presets</a>
-      <a href="/diy">&#x270F;&#xFE0F; DIY</a>
-      <a href="/ticker">&#x1F4C8; Ticker</a>
-      <a href="/state">&#x1F4CA; State</a>
-      <a href="/clock" class="active">&#x23F0; Clock</a>
-    </div>
-    <div class="power-btns">
-      <button class="on" id="pwr-on">On</button>
-      <button class="off" id="pwr-off">Off</button>
-    </div>
-  </div>
+</style>
 
   <div class="card">
     <div class="clock-readout" id="readout">--:--:--</div>
-    <div class="lamp-canvas">
-      <svg id="lamp" width="380" height="380" viewBox="-200 -200 400 400"></svg>
+    <div class="clock-canvas">
+      <svg id="clock-face" width="380" height="380" viewBox="-200 -200 400 400"></svg>
     </div>
   </div>
 
   <div class="card">
     <h2>Colors</h2>
-    <div class="color-row">
+    <div class="clock-color-row">
       <label>Outer (seconds)</label>
       <input type="color" id="color-outer" value="#FF0000">
       <div class="hex" id="hex-outer">FF0000</div>
     </div>
-    <div class="color-row">
+    <div class="clock-color-row">
       <label>Middle (minutes)</label>
       <input type="color" id="color-middle" value="#00FF00">
       <div class="hex" id="hex-middle">00FF00</div>
     </div>
-    <div class="color-row">
+    <div class="clock-color-row">
       <label>Inner (hours)</label>
       <input type="color" id="color-inner" value="#0000FF">
       <div class="hex" id="hex-inner">0000FF</div>
@@ -1722,17 +1689,16 @@ _PAGE_CLOCK = """<!doctype html>
 
   <div class="card">
     <h2>Hour format</h2>
-    <div class="mode-toggle" id="mode-toggle">
+    <div class="clock-mode-toggle" id="mode-toggle">
       <button data-mode="12h" class="active">12h</button>
       <button data-mode="24h">24h</button>
     </div>
-    <div class="controls">
+    <div class="clock-controls">
       <button class="primary" id="start-btn">Start</button>
       <button class="danger" id="stop-btn" disabled>Stop</button>
     </div>
-    <div id="status">not running</div>
+    <div id="clock-status">not running</div>
   </div>
-</div>
 
 <script type="module">
 import { computeClockPositions } from '/static/lamp-utils.js';
@@ -1783,7 +1749,7 @@ function segmentsContaining(ring, ledIdx) {
 }
 
 function drawClock(positions) {
-  const svg = $('#lamp');
+  const svg = $('#clock-face');
   svg.innerHTML = '';
   for (const [name, segs] of [['outer', OUTER], ['middle', MIDDLE], ['inner', INNER]]) {
     const g = RING_GEOMETRY[name];
@@ -1865,19 +1831,17 @@ for (const b of $$('#mode-toggle button')) {
 
 $('#start-btn').onclick = async () => {
   const j = await postJSON('/api/clock/start', {colors: state.colors, mode: state.mode});
-  if (!j.ok) { $('#status').textContent = 'error: ' + j.error; return; }
+  if (!j.ok) { $('#clock-status').textContent = 'error: ' + j.error; return; }
   state.running = true;
   setInputsDisabled(true);
-  $('#status').textContent = 'running since ' + (j.since ? j.since.slice(11, 16) : '?');
+  $('#clock-status').textContent = 'running since ' + (j.since ? j.since.slice(11, 16) : '?');
 };
 $('#stop-btn').onclick = async () => {
   await postJSON('/api/clock/stop', {});
   state.running = false;
   setInputsDisabled(false);
-  $('#status').textContent = 'stopped (last frame left on lamp)';
+  $('#clock-status').textContent = 'stopped (last frame left on lamp)';
 };
-$('#pwr-on').onclick = () => postJSON('/api/power', {on: true});
-$('#pwr-off').onclick = () => postJSON('/api/power', {on: false});
 
 async function refreshFromServer() {
   try {
@@ -1889,12 +1853,12 @@ async function refreshFromServer() {
       syncColorPickers();
       syncModeToggle();
       setInputsDisabled(true);
-      $('#status').textContent = 'running since ' + (j.since ? j.since.slice(11, 16) : '?');
+      $('#clock-status').textContent = 'running since ' + (j.since ? j.since.slice(11, 16) : '?');
     } else {
       state.running = false;
       setInputsDisabled(false);
-      if ($('#status').textContent === '' || $('#status').textContent === 'not running') {
-        $('#status').textContent = 'not running';
+      if ($('#clock-status').textContent === '' || $('#clock-status').textContent === 'not running') {
+        $('#clock-status').textContent = 'not running';
       }
     }
   } catch (e) { /* silent */ }
@@ -1906,7 +1870,8 @@ tickVisualizer();
 setInterval(tickVisualizer, 1000);
 refreshFromServer();
 setInterval(refreshFromServer, 5000);
-</script></body></html>"""
+</script>
+"""
 
 
 async def index_state(_req):
