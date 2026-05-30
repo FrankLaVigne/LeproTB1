@@ -92,3 +92,14 @@ async def test_cockpit_active_idle_when_d1_on_and_no_session():
     body = json.loads(resp.body.decode("utf-8") if isinstance(resp.body, bytes) else resp.body)
     assert body["mode"] == "idle"
     assert "label" in body  # always non-null label for the banner
+
+
+# --- /state redirect ----------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_state_route_redirects_to_root():
+    from aiohttp import web as _web
+    with pytest.raises(_web.HTTPFound) as exc:
+        await workshop.index_state_redirect(None)
+    assert exc.value.location == "/"
