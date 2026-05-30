@@ -409,7 +409,8 @@ async def index(_req):
 
 
 async def index_diy(_req):
-    return web.Response(text=_PAGE_DIY, content_type="text/html")
+    return web.Response(text=_render_shell("diy", _PANEL_DIY, "DIY"),
+                        content_type="text/html")
 
 
 async def index_ticker(_req):
@@ -920,49 +921,33 @@ setInterval(refresh, 2000);
 
 
 # Real DIY UI inlined in Task 6.
-_PAGE_DIY = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lepro DIY</title>
+_PANEL_DIY = """
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { font: 15px/1.4 system-ui, sans-serif; margin: 0;
-         background: #111; color: #eee; min-height: 100vh; }
-  .wrap { max-width: 540px; margin: 0 auto; padding: 16px; }
-  .header { display: flex; align-items: center; justify-content: space-between;
-            gap: 12px; margin-bottom: 12px; }
-  .tabs a { color: #aaa; text-decoration: none; padding: 6px 12px;
-            border-radius: 8px; }
-  .tabs a.active { color: #5fd9d9; background: #1f2a2a; font-weight: 700; }
-  .power-btns { display: flex; gap: 6px; }
-  .power-btns button { padding: 6px 12px; font-size: 13px; border: 0;
-                       border-radius: 8px; cursor: pointer; font-weight: 600; }
-  .power-btns button.on { background: #2c8f4f; color: #fff; }
-  .power-btns button.off { background: #8f2c2c; color: #fff; }
-  .card { background: #1c1c1f; padding: 14px; border-radius: 14px;
-          box-shadow: 0 4px 16px rgba(0,0,0,.4); margin-bottom: 14px; }
-  .lamp-canvas { display: flex; justify-content: center; padding: 12px 0; }
+  /* Feature-specific styles for the DIY panel.
+     Generic page chrome lives in /static/cockpit.css.
+     Classes prefixed .diy- to avoid collisions with other panels. */
+
+  .diy-canvas { display: flex; justify-content: center; padding: 12px 0; }
   svg .seg { cursor: pointer; transition: opacity .1s; }
   svg .seg:hover { opacity: .7; }
-  .toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-  .toolbar button { padding: 8px 12px; border: 0; border-radius: 8px;
-                    background: #2a2a30; color: #eee; cursor: pointer;
-                    font: inherit; }
-  .toolbar button.active { background: #5fd9d9; color: #111; font-weight: 700; }
-  .toolbar .res { margin-left: auto; display: flex; gap: 2px;
-                  background: #2a2a30; padding: 2px; border-radius: 8px; }
-  .toolbar .res button { padding: 6px 10px; background: transparent;
-                         border-radius: 6px; }
-  .toolbar .res button.active { background: #5fd9d9; color: #111; }
+  .diy-toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .diy-toolbar button { padding: 8px 12px; border: 0; border-radius: 8px;
+                        background: #2a2a30; color: #eee; cursor: pointer;
+                        font: inherit; }
+  .diy-toolbar button.active { background: #5fd9d9; color: #111; font-weight: 700; }
+  .diy-toolbar .res { margin-left: auto; display: flex; gap: 2px;
+                      background: #2a2a30; padding: 2px; border-radius: 8px; }
+  .diy-toolbar .res button { padding: 6px 10px; background: transparent;
+                              border-radius: 6px; }
+  .diy-toolbar .res button.active { background: #5fd9d9; color: #111; }
   h2 { font-size: 12px; margin: 0 0 8px; color: #aaa;
        text-transform: uppercase; letter-spacing: 0.08em; }
-  .color-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .color-row input[type=color] { width: 44px; height: 44px; border: 2px solid #444;
-                                  border-radius: 50%; cursor: pointer; background: none; }
-  .swatch { width: 28px; height: 28px; border-radius: 50%;
-            border: 2px solid #333; cursor: pointer; }
-  .swatch:hover { border-color: #5fd9d9; }
+  .diy-color-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .diy-color-row input[type=color] { width: 44px; height: 44px; border: 2px solid #444;
+                                     border-radius: 50%; cursor: pointer; background: none; }
+  .diy-swatch { width: 28px; height: 28px; border-radius: 50%;
+                border: 2px solid #333; cursor: pointer; }
+  .diy-swatch:hover { border-color: #5fd9d9; }
   .effect-grid { display: grid; grid-template-columns: repeat(3, 1fr);
                  gap: 8px; margin-bottom: 14px; }
   .effect-grid button { padding: 10px; border: 0; border-radius: 8px;
@@ -979,33 +964,19 @@ _PAGE_DIY = """<!doctype html>
   input[type=text] { width: 100%; padding: 10px 12px; border-radius: 8px;
                      background: #2a2a30; color: #eee; border: 1px solid #333;
                      font: inherit; }
-  .btns { display: flex; gap: 8px; margin-top: 12px; }
-  .btns button { flex: 1; padding: 10px; border: 0; border-radius: 10px;
-                 background: #2a2a30; color: #eee; cursor: pointer;
-                 font: inherit; font-weight: 600; }
-  .btns button.primary { background: #5fd9d9; color: #111; }
+  .diy-btns { display: flex; gap: 8px; margin-top: 12px; }
+  .diy-btns button { flex: 1; padding: 10px; border: 0; border-radius: 10px;
+                     background: #2a2a30; color: #eee; cursor: pointer;
+                     font: inherit; font-weight: 600; }
+  .diy-btns button.primary { background: #5fd9d9; color: #111; }
   #status { font-size: 12px; color: #777; margin-top: 8px; min-height: 1.2em; }
-</style></head>
-<body><div class="wrap">
-  <div class="header">
-    <div class="tabs">
-      <a href="/">&#x1F3A8; Presets</a>
-      <a href="/diy" class="active">&#x270F;&#xFE0F; DIY</a>
-      <a href="/ticker">&#x1F4C8; Ticker</a>
-      <a href="/state">&#x1F4CA; State</a>
-      <a href="/clock">&#x23F0; Clock</a>
-    </div>
-    <div class="power-btns">
-      <button class="on" id="pwr-on">&#x23FB; On</button>
-      <button class="off" id="pwr-off">&#x23FB; Off</button>
-    </div>
-  </div>
+</style>
 
-  <div class="card lamp-canvas">
+  <div class="card diy-canvas">
     <svg id="lamp" width="380" height="380" viewBox="-200 -200 400 400"></svg>
   </div>
 
-  <div class="toolbar">
+  <div class="diy-toolbar">
     <button class="tool active" data-tool="draw">&#x270F;&#xFE0F; Draw</button>
     <button class="tool" data-tool="fill">&#x1FAA3; Fill</button>
     <button class="tool" data-tool="erase">&#x1F9FD; Erase</button>
@@ -1018,15 +989,15 @@ _PAGE_DIY = """<!doctype html>
 
   <div class="card">
     <h2>Color</h2>
-    <div class="color-row">
+    <div class="diy-color-row">
       <input type="color" id="picker" value="#ff8000">
-      <div class="swatch" style="background:#FF0000" data-hex="FF0000"></div>
-      <div class="swatch" style="background:#FF8000" data-hex="FF8000"></div>
-      <div class="swatch" style="background:#FFFF00" data-hex="FFFF00"></div>
-      <div class="swatch" style="background:#00C000" data-hex="00C000"></div>
-      <div class="swatch" style="background:#00FFFF" data-hex="00FFFF"></div>
-      <div class="swatch" style="background:#0000FF" data-hex="0000FF"></div>
-      <div class="swatch" style="background:#8000FF" data-hex="8000FF"></div>
+      <div class="diy-swatch" style="background:#FF0000" data-hex="FF0000"></div>
+      <div class="diy-swatch" style="background:#FF8000" data-hex="FF8000"></div>
+      <div class="diy-swatch" style="background:#FFFF00" data-hex="FFFF00"></div>
+      <div class="diy-swatch" style="background:#00C000" data-hex="00C000"></div>
+      <div class="diy-swatch" style="background:#00FFFF" data-hex="00FFFF"></div>
+      <div class="diy-swatch" style="background:#0000FF" data-hex="0000FF"></div>
+      <div class="diy-swatch" style="background:#8000FF" data-hex="8000FF"></div>
     </div>
   </div>
 
@@ -1055,13 +1026,12 @@ _PAGE_DIY = """<!doctype html>
   <div class="card">
     <label>Save as</label>
     <input type="text" id="vname" value="">
-    <div class="btns">
+    <div class="diy-btns">
       <button class="primary" id="save-btn">&#x1F4BE; Save</button>
       <button id="reset-btn">&#x21BA; Reset</button>
     </div>
     <div id="status"></div>
   </div>
-</div>
 
 <script type="module">
 const $ = s => document.querySelector(s);
@@ -1200,7 +1170,7 @@ for (const b of $$('.res-btn')) b.onclick = () => {
   setActiveButton('.res-btn', String(state.res), 'res');
   drawCanvas();
 };
-for (const b of $$('.swatch')) b.onclick = () => {
+for (const b of $$('.diy-swatch')) b.onclick = () => {
   state.color = b.dataset.hex;
   $('#picker').value = '#' + state.color;
 };
@@ -1290,7 +1260,8 @@ async function loadLampState() {
 drawCanvas();
 setDefaultName();
 loadLampState();
-</script></body></html>"""
+</script>
+"""
 
 
 async def api_presets(_req):
