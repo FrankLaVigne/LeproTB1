@@ -162,6 +162,17 @@ sustained directional move (3 consecutive same-direction ticks totalling ≥
 0.5%), it earns a **⚡ FAST** badge in the page and the whole lamp switches from
 Steady to Breathe (per-ring colors still visible) until the streak ends.
 
+A **Clock** page is available at `http://<vm-ip>:8081/clock` — turns the lamp
+into a three-handed analog clock with the outer ring showing seconds (88
+LEDs), middle showing minutes (62), and inner showing hours (46). One bright
+LED per ring marks the current position, drifting smoothly between marks as
+the next-finer unit ticks. Per-ring colors are configurable from the page
+(default: red seconds / green minutes / blue hours); the hour ring has a
+12h / 24h toggle. Updates every second. Like the ticker, while the clock is
+running the DIY paint and workshop preview endpoints return HTTP 409;
+brightness and saves stay available. Stop leaves the last frame on the lamp
+(use the power button to turn it off).
+
 ## Protocol notes
 
 Control commands are an MQTT publish to `le/{deviceId}/prp/set` with payload
