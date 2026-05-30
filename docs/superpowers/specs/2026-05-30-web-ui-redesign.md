@@ -19,7 +19,7 @@ panel, the tab strip, and a slot for the active feature's content. Each
 feature's content moves into its own panel string (just the right-side
 content — no more per-page header, no more per-page tabs, no more per-page
 power buttons). The shell, design tokens, and the cockpit's interactive JS
-all live in `static/` so they're shared via aiohttp's static handler.
+all live in `web/static/` so they're shared via aiohttp's static handler.
 
 URLs stay one-per-feature for browser-native nav and deep linking:
 
@@ -29,7 +29,7 @@ URLs stay one-per-feature for browser-native nav and deep linking:
 
 ## Design system
 
-CSS custom properties in `static/cockpit.css`. Single source of truth — both
+CSS custom properties in `web/static/cockpit.css`. Single source of truth — both
 Python-rendered pages and any JS that builds DOM elements reference the same
 tokens.
 
@@ -111,7 +111,7 @@ Letter-spacing 0.15-0.25em on small ALL-CAPS labels.
 Top to bottom:
 
 1. **Brand row**: `LEPRO` (light, letter-spaced) on left, device ID in monospace on right.
-2. **Lamp visualizer**: 240×240 glass disc with the 3-ring SVG inside. Polls `/api/lamp/state` every 2s, parses d50, reverse-rotates to page-space (the existing `static/lamp-utils.js` helpers). Lit pixels glow via `box-shadow`. Renders in 48-mode (segment-level) to match diffuser physics, same as the current State viz.
+2. **Lamp visualizer**: 240×240 glass disc with the 3-ring SVG inside. Polls `/api/lamp/state` every 2s, parses d50, reverse-rotates to page-space (the existing `web/static/lamp-utils.js` helpers). Lit pixels glow via `box-shadow`. Renders in 48-mode (segment-level) to match diffuser physics, same as the current State viz.
 3. **Active-mode banner**: small glass card highlighting what's currently driving the lamp. Backed by a new `GET /api/cockpit/active` endpoint (see Routes below). Shows one of:
    - `idle` — lamp is on but nothing's actively painting it (last frame just sits there)
    - `⏰ Clock — HH:MM:SS` — clock session running
@@ -159,11 +159,11 @@ updating). The right panel becomes just the configuration.
 ### New / restructured files
 
 ```
-static/
+web/static/
   cockpit.css         (new — design tokens + .glass + responsive shell)
   cockpit.js          (new — left panel updates: lamp viz, mode banner, brightness, diagnostics)
   lamp-utils.js       (already exists — parseD50_N01, unrotateToPage, computeClockPositions)
-workshop.py
+web/server.py
   _SHELL              (new — module function or template string that wraps a per-feature panel string)
   _PANEL_PRESETS      (new — just the right-side content, replaces _PAGE)
   _PANEL_DIY          (new — replaces _PAGE_DIY)
@@ -175,7 +175,7 @@ workshop.py
 
 ### Shell composition
 
-`workshop.py` gets a small Python helper:
+`web/server.py` gets a small Python helper:
 
 ```python
 def _render_shell(active_tab: str, panel_html: str, page_title: str) -> str:
@@ -210,12 +210,39 @@ Backend logic:
 1. If `_client.state[did]["d1"] == 0` → `off`
 2. Else if `_clock_session is not None and .running` → `clock` with `.snapshot()["now_displayed"]`
 3. Else if `_ticker_session is not None and .running` → `ticker` with comma-joined symbols
-4. Else (lamp is on but nothing's actively driving it) → `idle` showing the most recent activity by best guess
-   - For simplicity in v1: just return `idle` with no detail. We can refine if it feels lacking.
+4. Else if `_preview_task is not None and not _preview_task.done()` → `preset` with the current preset's `name` (recovered from a new `_preview_name` module global set when `api_preview` starts the task)
+5. Else (lamp is on but nothing's actively driving it) → `idle`
 
-The "diy" and "preset" modes need server-side tracking we don't currently
-have. **Deferred to v2.** For v1: `idle` is good enough — the user can see
-the last-painted state via the visualizer.
+The "diy" mode (most recent paint was a DIY paint) is **still deferred** —
+we'd need to track who last wrote a d50, which adds bookkeeping with limited
+payoff. For v1 `idle` covers it: the lamp viz already shows what the lamp is
+displaying, and any DIY work happens with the user actively painting on the
+DIY tab.
+
+**Preset mode is in scope** because it's the only mode where a background
+task on the server overwrites the lamp every few seconds — without surfacing
+it in the banner, the user has no way to tell why their DIY paints or color
+changes "don't stick" (see [task #97](#); root cause of the 2026-05-30
+"lamp not responding" report).
+
+### Auto-stop of the preview loop
+
+The preview task (`_preview_task`, started by `POST /api/preview`) currently
+survives anything except an explicit `POST /api/stop`. After the redesign
+lands, the following also tear it down (mirrors the existing
+ticker/clock-stop pattern):
+
+- `POST /api/diy/paint` — about to overwrite the lamp with a one-shot paint,
+  so the preview loop would just clobber it next frame. Auto-cancel before
+  sending.
+- `POST /api/power {on: false}` — same single-call teardown helper that
+  already stops ticker + clock.
+- `POST /api/ticker/start`, `POST /api/clock/start` — same mutex behaviour
+  as ticker-vs-clock.
+
+A small `_stop_preview()` helper in `web/server.py` consolidates the
+cancel-and-await-and-clear-name sequence so all five call sites use one
+implementation.
 
 ### Tab swap = navigation, not SPA
 
@@ -299,7 +326,7 @@ A new test file `tests/test_cockpit_shell.py` covers:
 
 ## Deliberately deferred (YAGNI)
 
-- Active-mode `diy` / `preset` tracking (server doesn't know which page made the last paint; defer to a future "activity log" feature).
+- Active-mode `diy` tracking (server doesn't know which page made the last paint; not worth tracking. Preset mode IS tracked — see Auto-stop section above.).
 - Page transitions / animations between tabs.
 - Light theme.
 - Keyboard shortcuts (number keys to switch tabs, space to toggle power).
@@ -310,9 +337,9 @@ A new test file `tests/test_cockpit_shell.py` covers:
 
 | File | Change | Lines (est.) |
 |---|---|---|
-| `static/cockpit.css` (new) | Design tokens, .glass, responsive shell, base styles | ~250 |
-| `static/cockpit.js` (new) | Left panel: viz update, brightness wire, mode banner poll, power buttons, diagnostics | ~150 |
-| `workshop.py` | Drop 4 page constants, add `_SHELL_TEMPLATE` + `_render_shell` + 4 `_PANEL_*` constants, drop `_PAGE_STATE` + state route, add `api_cockpit_active` route | ~+200, ~-1500 (existing inline HTML) |
+| `web/static/cockpit.css` (new) | Design tokens, .glass, responsive shell, base styles | ~250 |
+| `web/static/cockpit.js` (new) | Left panel: viz update, brightness wire, mode banner poll, power buttons, diagnostics | ~150 |
+| `web/server.py` | Drop 4 page constants, add `_SHELL_TEMPLATE` + `_render_shell` + 4 `_PANEL_*` constants, drop `_PAGE_STATE` + state route, add `api_cockpit_active` route, add `_stop_preview()` helper + integrate into power/ticker-start/clock-start/diy-paint | ~+220, ~-1500 (existing inline HTML) |
 | `tests/test_cockpit_shell.py` (new) | Shell tests | ~60 |
 | `README.md` | Replace per-page descriptions with the cockpit overview | ~-20, ~+10 |
 
