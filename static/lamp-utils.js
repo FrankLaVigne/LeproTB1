@@ -57,3 +57,30 @@ export function lampStateToPageLeds(stateJson) {
   if (!physical) return null;
   return unrotateToPage(physical);
 }
+
+// Client-side clock position math (mirrors clock.compute_positions in
+// Python). Used by /clock's visualizer to render at 1 Hz without
+// polling the server. `now` is a JS Date; `mode` is "12h" or "24h".
+// Returns {outer, middle, inner} per-ring page-space LED indices.
+export function computeClockPositions(now, mode) {
+  if (mode !== "12h" && mode !== "24h") {
+    throw new Error(`mode must be "12h" or "24h", got ${mode}`);
+  }
+  const secFrac = now.getSeconds() + now.getMilliseconds() / 1000;
+  const outer = Math.round(secFrac * 88 / 60) % 88;
+
+  const minFrac = now.getMinutes() + secFrac / 60;
+  const middle = Math.round(minFrac * 62 / 60) % 62;
+
+  let hourUnit, cycle;
+  if (mode === "12h") {
+    hourUnit = (now.getHours() % 12) + now.getMinutes() / 60;
+    cycle = 12;
+  } else {
+    hourUnit = now.getHours() + now.getMinutes() / 60;
+    cycle = 24;
+  }
+  const inner = Math.round(hourUnit * 46 / cycle) % 46;
+
+  return { outer, middle, inner };
+}
