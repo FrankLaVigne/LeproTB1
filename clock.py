@@ -103,3 +103,54 @@ class ClockSession:
             "colors": dict(self._colors),
             "now_displayed": self._last_displayed,
         }
+
+    async def _tick_once(self) -> None:
+        """Compute the current clock face and send it to the lamp.
+
+        Imports workshop locally to avoid a circular import — workshop loads
+        clock, but the rotation + d50 helpers we need live at workshop's
+        module scope.
+        """
+        from workshop import apply_lamp_rotation, build_d50_from_leds  # noqa: PLC0415
+
+        now = datetime.now()
+        positions = compute_positions(now, mode=self._mode)
+        page_leds = build_clock_leds(positions, self._colors)
+        physical_leds = apply_lamp_rotation(page_leds)
+        d50 = build_d50_from_leds(physical_leds, "Steady", 50)
+        self._last_displayed = now.isoformat(timespec="seconds")
+        try:
+            await self._client.send_raw({"d1": 1, "d2": 2, "d50": d50})
+        except Exception:  # noqa: BLE001 — log and retry next tick
+            pass
+
+    async def start(self) -> None:
+        """Spawn the background polling loop."""
+        import asyncio
+        if self.running:
+            return
+        self._since = datetime.now().isoformat(timespec="seconds")
+        loop = asyncio.get_running_loop()
+        self._task = loop.create_task(self._run())
+
+    async def _run(self) -> None:
+        """The loop body. Cancelled by stop()."""
+        import asyncio
+        try:
+            while True:
+                await self._tick_once()
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            pass
+
+    async def stop(self) -> None:
+        """Cancel the polling loop. Leaves the lamp in its current state."""
+        import asyncio
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+            self._task = None
+        self._since = None

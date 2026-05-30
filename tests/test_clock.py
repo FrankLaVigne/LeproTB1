@@ -152,3 +152,66 @@ def test_clock_session_snapshot_json_serialisable():
     import json
     sess = clock.ClockSession(client=None, colors=_colors(), mode="24h")
     assert json.dumps(sess.snapshot())
+
+
+# --- ClockSession async tests -------------------------------------------------
+
+
+class _FakeClient:
+    def __init__(self):
+        self.sent = []
+
+    async def send_raw(self, payload):
+        self.sent.append(payload)
+
+
+@pytest.mark.asyncio
+async def test_session_tick_once_sends_d50_with_three_lit_leds():
+    client = _FakeClient()
+    sess = clock.ClockSession(client=client, colors=_colors(), mode="12h")
+    await sess._tick_once()
+    assert len(client.sent) == 1
+    payload = client.sent[0]
+    assert payload["d1"] == 1
+    assert payload["d2"] == 2
+    # The d50 should contain the three colors (rotated + RLE-encoded, but
+    # the colors themselves appear in the palette either way).
+    d50 = payload["d50"]
+    assert "FF0000" in d50
+    assert "00FF00" in d50
+    assert "0000FF" in d50
+
+
+@pytest.mark.asyncio
+async def test_session_tick_once_updates_now_displayed():
+    client = _FakeClient()
+    sess = clock.ClockSession(client=client)
+    assert sess.snapshot()["now_displayed"] is None
+    await sess._tick_once()
+    assert sess.snapshot()["now_displayed"] is not None
+
+
+@pytest.mark.asyncio
+async def test_session_start_then_stop_lifecycle():
+    client = _FakeClient()
+    sess = clock.ClockSession(client=client)
+    assert sess.running is False
+    await sess.start()
+    assert sess.running is True
+    await sess.stop()
+    assert sess.running is False
+
+
+@pytest.mark.asyncio
+async def test_session_stop_leaves_lamp_state_unchanged():
+    # Unlike the ticker, the clock's stop does NOT send d1:0 — it leaves the
+    # last frame on the lamp.
+    client = _FakeClient()
+    sess = clock.ClockSession(client=client)
+    await sess.start()
+    await sess.stop()
+    # No "{'d1': 0}" payload should appear in client.sent.
+    assert {"d1": 0} not in client.sent
+    for p in client.sent:
+        # Every sent payload has d1=1 (clock keeps the lamp on).
+        assert p.get("d1") != 0
