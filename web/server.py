@@ -275,6 +275,98 @@ _HERE = Path(__file__).resolve().parent
 _PROJECT_ROOT = _HERE.parent  # repo root, parent of the web/ package
 _PRESETS_DIR = _PROJECT_ROOT / "presets"
 
+# ---------------------------------------------------------------------------
+# Cockpit shell — shared layout for every page. See
+# docs/superpowers/specs/2026-05-30-web-ui-redesign.md.
+
+_SHELL_TEMPLATE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lepro &middot; {title}</title>
+<link rel="stylesheet" href="/static/cockpit.css">
+</head><body>
+<div class="cockpit">
+
+  <aside class="cockpit-left">
+    <div class="brand-row">
+      <div class="brand">LEPRO</div>
+      <div class="device-id" id="device-id">&mdash;</div>
+    </div>
+
+    <div class="viz-wrap">
+      <svg id="lamp-viz" width="240" height="240" viewBox="-200 -200 400 400" aria-label="lamp visualizer"></svg>
+    </div>
+
+    <div class="active-banner" id="active-banner">
+      <div class="label">ACTIVE</div>
+      <div class="value" id="active-banner-value">&mdash;</div>
+    </div>
+
+    <div class="power-btns">
+      <button class="on"  id="pwr-on"  aria-label="Power on">&#x23FB; ON</button>
+      <button class="off" id="pwr-off" aria-label="Power off">&#x23FB; OFF</button>
+    </div>
+
+    <div class="brightness">
+      <div class="brightness-head">
+        <span class="label">&#x2600; BRIGHTNESS</span>
+        <span class="val" id="brightness-val">&mdash;</span>
+      </div>
+      <input type="range" id="brightness-slider" min="0" max="100" value="80">
+    </div>
+
+    <details class="diag">
+      <summary>&#x25B8; DIAGNOSTICS</summary>
+      <div class="diag-body" id="diag-body">
+        <div>&mdash;</div><div class="v">&mdash;</div>
+      </div>
+    </details>
+  </aside>
+
+  <main class="cockpit-right">
+    <nav class="tabs">
+      <a href="/" {cls_presets}>&#x1F3A8; Presets</a>
+      <a href="/diy" {cls_diy}>&#x270F;&#xFE0F; DIY</a>
+      <a href="/ticker" {cls_ticker}>&#x1F4C8; Ticker</a>
+      <a href="/clock" {cls_clock}>&#x23F0; Clock</a>
+    </nav>
+    <section class="panel">
+{panel}
+    </section>
+  </main>
+
+</div>
+<script type="module" src="/static/cockpit.js"></script>
+</body></html>
+"""
+
+
+def _render_shell(active: str, panel_html: str, title: str) -> str:
+    """Wrap a per-feature panel string in the cockpit shell.
+
+    ``active`` is one of "presets", "diy", "ticker", "clock" — used to mark
+    the active tab. ``panel_html`` is dropped verbatim into the right-side
+    panel slot (may contain its own <script type="module"> block).
+    """
+    active_classes = {
+        "presets": "",
+        "diy": "",
+        "ticker": "",
+        "clock": "",
+    }
+    if active not in active_classes:
+        raise ValueError(f"unknown tab {active!r}; expected one of {list(active_classes)}")
+    active_classes[active] = 'class="active"'
+    return _SHELL_TEMPLATE.format(
+        title=title,
+        panel=panel_html,
+        cls_presets=active_classes["presets"],
+        cls_diy=active_classes["diy"],
+        cls_ticker=active_classes["ticker"],
+        cls_clock=active_classes["clock"],
+    )
+
+
 # Module-level singletons set during lifespan startup.
 _client: LeproClient | None = None
 _preview_task: asyncio.Task | None = None
