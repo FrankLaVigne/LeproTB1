@@ -272,7 +272,8 @@ logging.basicConfig(level=logging.INFO)
 _LOG = logging.getLogger("workshop")
 
 _HERE = Path(__file__).resolve().parent
-_PRESETS_DIR = _HERE / "presets"
+_PROJECT_ROOT = _HERE.parent  # repo root, parent of the web/ package
+_PRESETS_DIR = _PROJECT_ROOT / "presets"
 
 # Module-level singletons set during lifespan startup.
 _client: LeproClient | None = None
@@ -1382,7 +1383,7 @@ async def api_brightness(req):
 
 # --- Stock ticker endpoints ---------------------------------------------------
 
-import ticker as _ticker_mod  # alias keeps namespace tidy
+from web import ticker as _ticker_mod  # alias keeps namespace tidy
 
 _ticker_session = None  # type: ignore[assignment]
 
@@ -1484,7 +1485,7 @@ async def api_lamp_state(_req):
 
 # --- Clock endpoints ---------------------------------------------------------
 
-import clock as _clock_mod
+from web import clock as _clock_mod
 
 _clock_session = None  # type: ignore[assignment]
 

@@ -35,17 +35,31 @@ cp config.json.example config.json   # then edit with your Lepro account
 `config.json` (git-ignored) or the `LEPRO_ACCOUNT` / `LEPRO_PASSWORD` /
 `LEPRO_REGION` environment variables provide credentials. Regions: `na`, `eu`, `fe`.
 
+## Project layout
+
+```
+lepro/        package — the cloud client (LeproClient) + utilities
+cli/          terminal scripts: main, stock_lamp, play_preset
+web/          aiohttp UI: server (cockpit), ticker, clock, legacy, static/
+mcphost/      FastMCP host (named mcphost/ so it doesn't shadow PyPI's mcp)
+presets/      preset library (data)
+docs/         protocol notes, calibration, plans & specs
+tests/        pytest suite
+```
+
+Every runnable script is a Python module: launch with `python -m <pkg>.<mod>`.
+
 ## CLI
 
 ```bash
-.venv/bin/python cli.py discover          # list devices + their ids
-.venv/bin/python cli.py state             # dump live state of the first device
-.venv/bin/python cli.py on
-.venv/bin/python cli.py off
-.venv/bin/python cli.py bright 40         # 40% brightness
-.venv/bin/python cli.py color 255 0 120   # RGB
-.venv/bin/python cli.py white 3000 60     # 3000K @ 60%
-.venv/bin/python cli.py raw '{"d1":1,"d2":1,"d5":"00F003E803E8"}'
+.venv/bin/python -m cli.main discover          # list devices + their ids
+.venv/bin/python -m cli.main state             # dump live state of the first device
+.venv/bin/python -m cli.main on
+.venv/bin/python -m cli.main off
+.venv/bin/python -m cli.main bright 40         # 40% brightness
+.venv/bin/python -m cli.main color 255 0 120   # RGB
+.venv/bin/python -m cli.main white 3000 60     # 3000K @ 60%
+.venv/bin/python -m cli.main raw '{"d1":1,"d2":1,"d5":"00F003E803E8"}'
 ```
 
 Add `--did <id>` to target a specific light (default: the first one discovered).
@@ -53,13 +67,16 @@ Add `--did <id>` to target a specific light (default: the first one discovered).
 ## Web front end
 
 ```bash
-.venv/bin/python app.py        # serves on 0.0.0.0:8080
+.venv/bin/python -m web.server        # serves on 0.0.0.0:8081
 ```
 
-Open `http://<your-vm-ip>:8080`. It holds one persistent login + MQTT connection
-and gives you device selection, on/off, a brightness slider, a color picker,
-and a white-temperature slider. Override the bind address with `LEPRO_HOST` /
-`LEPRO_PORT`.
+Open `http://<your-vm-ip>:8081`. Five tabs: Presets / DIY / Ticker / State /
+Clock. Override the bind address with `LEPRO_WORKSHOP_HOST` /
+`LEPRO_WORKSHOP_PORT`.
+
+The legacy single-page demo from earlier in the project lives at
+`web/legacy.py` (`python -m web.legacy`) — preserved for reference; not
+recommended for daily use.
 
 ## MCP server
 
@@ -68,7 +85,7 @@ the network:
 
 ```bash
 # add "mcp_token": "<random>" to config.json, then:
-.venv/bin/python mcp_server.py        # streamable-HTTP on 0.0.0.0:8765
+.venv/bin/python -m mcphost.server        # streamable-HTTP on 0.0.0.0:8765
 ```
 
 Clients connect to `http://<vm-ip>:8765/mcp` with header
@@ -84,7 +101,7 @@ into the lamp's Home, so it doesn't fight your phone for the single session.
 
 ### Effects on the TB1
 Effect/segment payloads were reverse-engineered from Lepro bulbs/strips. To
-confirm what the TB1 actually uses, run `cli.py capture`, trigger each effect in
+confirm what the TB1 actually uses, run `python -m cli.main capture`, trigger each effect in
 the app, and adjust the catalog to the logged `d50`/`d60` values. Segment groups
 are currently capped at 9 until the d50 count-field width is verified this way.
 
@@ -94,9 +111,9 @@ Color the lamp green on every uptick and red on every downtick of a single
 stock, polled live:
 
 ```bash
-.venv/bin/python stock_lamp.py IBM
-.venv/bin/python stock_lamp.py 7203.T --interval 10   # Toyota on Tokyo
-.venv/bin/python stock_lamp.py BBVA.MC --interval 60  # BBVA on Madrid
+.venv/bin/python -m cli.stock_lamp IBM
+.venv/bin/python -m cli.stock_lamp 7203.T --interval 10   # Toyota on Tokyo
+.venv/bin/python -m cli.stock_lamp BBVA.MC --interval 60  # BBVA on Madrid
 ```
 
 The ticker uses Yahoo Finance's suffix convention (no suffix = US listings;
@@ -128,7 +145,7 @@ via a color-combo picker, naming the variant, previewing it on the lamp, and
 saving the result as a new `presets/*.json`.
 
 ```bash
-.venv/bin/python workshop.py        # serves on 0.0.0.0:8081
+.venv/bin/python -m web.server        # serves on 0.0.0.0:8081
 ```
 
 Open `http://<vm-ip>:8081` in a browser. Left column lists every preset with a
@@ -139,7 +156,7 @@ sliders (decode pending — see `docs/D50_FORMAT.md`). Preview pushes the recolo
 animation to the lamp live; Save writes a new file under `presets/`.
 
 LAN-only — no auth. Override the bind address with `LEPRO_WORKSHOP_HOST` /
-`LEPRO_WORKSHOP_PORT`. Coexists with `app.py` (8080) and the MCP server (8765).
+`LEPRO_WORKSHOP_PORT`. Coexists with the MCP server (8765).
 
 The workshop now also includes a **DIY editor** at `http://<vm-ip>:8081/diy`,
 mimicking the Lepro app's DIY screen — a clickable 3-ring SVG canvas (48 app-
@@ -194,20 +211,25 @@ The `d` dictionary fields:
 
 The **TB1** matches the `B1` model token, so this client treats it as a
 B-series device (RGB via `d5`, white via `d3`/`d4`). If a command doesn't behave
-as expected on your unit, run `cli.py state` to see what fields it actually
-reports, then use `cli.py raw '{...}'` to experiment and refine.
+as expected on your unit, run `python -m cli.main state` to see what fields it
+actually reports, then use `python -m cli.main raw '{...}'` to experiment and
+refine.
 
 ## Files
 
-- `lepro.py` — async cloud client (`LeproClient`): login, discovery, MQTT, commands.
-- `cli.py` — command-line interface.
-- `app.py` — aiohttp web front end.
-- `workshop.py` — preset workshop / DIY editor / stock ticker / state viewer at `:8081`.
-- `ticker.py` — stock-ticker session module used by `workshop.py`.
-- `stock_lamp.py` — standalone CLI version of the stock ticker.
-- `mcp_server.py` — networked FastMCP server with 12 lamp tools.
-- `client_key.pem` — the static MQTT client private key shipped publicly with the
+- `lepro/client.py` — async cloud client (`LeproClient`): login, discovery, MQTT, commands.
+- `lepro/__init__.py` — re-exports `LeproClient`, `Device`, `AnimationPlayer`, etc.
+- `lepro/client_key.pem` — the static MQTT client private key shipped publicly with the
   app (per-account certs are downloaded at login into `certs/`).
+- `cli/main.py` — command-line interface (`python -m cli.main`).
+- `cli/stock_lamp.py` — standalone CLI version of the stock ticker.
+- `cli/play_preset.py` — replay a captured preset on the lamp.
+- `web/server.py` — the cockpit web UI: Presets / DIY / Ticker / State / Clock at `:8081`.
+- `web/ticker.py` — stock-ticker `TickerSession` (used by `web/server.py`).
+- `web/clock.py` — clock-on-rings `ClockSession` (used by `web/server.py`).
+- `web/legacy.py` — older single-page demo (`python -m web.legacy`), kept for reference.
+- `web/static/lamp-utils.js` — shared d50 parser + page→physical rotation helpers.
+- `mcphost/server.py` — networked FastMCP server with 12 lamp tools.
 
 ## Documentation (`docs/`)
 

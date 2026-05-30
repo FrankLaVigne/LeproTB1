@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-import clock
+from web import clock
 
 
 # --- compute_positions tests --------------------------------------------------

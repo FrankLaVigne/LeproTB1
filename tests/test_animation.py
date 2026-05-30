@@ -1,7 +1,7 @@
 import asyncio
 import json
 import pytest
-import lepro
+from lepro import client as lepro
 
 
 def test_frame_to_payload_color_b_series():

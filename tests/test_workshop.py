@@ -2,7 +2,7 @@
 
 import pytest
 
-import workshop
+from web import server as workshop
 
 
 def test_extract_palette_single_frame_one_color():

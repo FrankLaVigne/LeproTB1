@@ -1,5 +1,7 @@
-import mcp_server
-import mcp_server as _mcp_server  # explicit alias so we can manipulate module globals
+import lepro
+
+from mcphost import server as mcp_server
+from mcphost import server as _mcp_server  # explicit alias so we can manipulate module globals
 
 
 def test_guarded_tool_exposes_real_params():

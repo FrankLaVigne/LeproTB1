@@ -62,8 +62,9 @@ _BASE_HEADERS = {
 }
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_HERE)  # repo root, parent of the lepro/ package
 _DEFAULT_KEY = os.path.join(_HERE, "client_key.pem")
-_CERT_DIR = os.path.join(_HERE, "certs")
+_CERT_DIR = os.path.join(_PROJECT_ROOT, "certs")
 # Reuse a cached token for this long before re-running /user/login, which the
 # API throttles aggressively (code -905). Token itself lives longer server-side.
 _SESSION_TTL = 1800
@@ -585,9 +586,9 @@ class AnimationPlayer:
 
 
 def load_config() -> dict:
-    """Credentials from config.json (next to this file) or LEPRO_* env vars."""
+    """Credentials from config.json (at the project root) or LEPRO_* env vars."""
     cfg = {}
-    path = os.path.join(_HERE, "config.json")
+    path = os.path.join(_PROJECT_ROOT, "config.json")
     if os.path.exists(path):
         with open(path) as f:
             cfg = json.load(f)

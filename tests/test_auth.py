@@ -1,5 +1,5 @@
 import pytest
-from mcp_server import BearerAuthMiddleware
+from mcphost.server import BearerAuthMiddleware
 
 
 class _SpyApp:

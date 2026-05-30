@@ -107,11 +107,11 @@ class ClockSession:
     async def _tick_once(self) -> None:
         """Compute the current clock face and send it to the lamp.
 
-        Imports workshop locally to avoid a circular import — workshop loads
-        clock, but the rotation + d50 helpers we need live at workshop's
-        module scope.
+        Imports the web.server module locally to avoid a circular import —
+        web.server loads clock, but the rotation + d50 helpers we need live
+        at web.server's module scope.
         """
-        from workshop import apply_lamp_rotation, build_d50_from_leds  # noqa: PLC0415
+        from web.server import apply_lamp_rotation, build_d50_from_leds  # noqa: PLC0415
 
         now = datetime.now()
         positions = compute_positions(now, mode=self._mode)

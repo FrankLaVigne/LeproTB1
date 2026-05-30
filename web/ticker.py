@@ -82,7 +82,7 @@ def build_ticker_d50(rings, flash_color, effect="Steady"):
     state; ``effect="Breathe"`` is the sustained "fast mode" — the per-ring
     colors are still visible but the whole lamp pulses.
     """
-    from workshop import build_d50_from_leds  # noqa: PLC0415
+    from web.server import build_d50_from_leds  # noqa: PLC0415
 
     if flash_color is not None:
         leds = [flash_color] * 196

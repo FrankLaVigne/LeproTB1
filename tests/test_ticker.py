@@ -2,7 +2,7 @@
 
 import pytest
 
-import ticker
+from web import ticker
 
 
 # --- decide_ring_color tests --------------------------------------------------
@@ -82,7 +82,7 @@ def test_build_ticker_d50_all_off_steady():
 def test_build_ticker_d50_flash_color_overrides_per_ring():
     # During a flash the per-ring colors are hidden: single-color palette,
     # whole-lamp Breathe tail.
-    import workshop
+    from web import server as workshop
     rings = _rings(outer="00FF00", middle="FF0000", inner="FFFF00")
     d50 = ticker.build_ticker_d50(rings, flash_color="00FF00")
     expected = ("N01:P10001"
@@ -469,7 +469,7 @@ def test_build_ticker_d50_breathe_multicolor_keeps_per_ring_palette():
     # New: effect="Breathe" with flash_color=None keeps the per-ring palette
     # but uses the Breathe tail (so the lamp pulses while showing per-ring
     # directional colors).
-    import workshop
+    from web import server as workshop
     rings = _rings(outer="00FF00", middle="FF0000", inner="FFFF00")
     d50 = ticker.build_ticker_d50(rings, flash_color=None, effect="Breathe")
     expected = ("N01:P1000300FF00FF0000FFFF00"

@@ -1,4 +1,4 @@
-import lepro
+from lepro import client as lepro
 
 
 def test_speed_to_hex_zero_is_1000():

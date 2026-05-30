@@ -6,7 +6,7 @@ from itertools import chain, repeat
 
 import pytest
 
-import stock_lamp
+from cli import stock_lamp
 
 
 # --- decide_command tests ------------------------------------------------------
