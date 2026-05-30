@@ -8,7 +8,9 @@ LED per ring), per-ring configurable colors, 12h default with 24h toggle,
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
+from typing import Optional
 
 
 _VALID_MODES = ("12h", "24h")
@@ -55,3 +57,49 @@ def build_clock_leds(positions: dict, colors: dict) -> list:
     leds[88 + positions["middle"]] = colors["middle"]
     leds[150 + positions["inner"]] = colors["inner"]
     return leds
+
+
+_HEX6 = re.compile(r"^[0-9A-Fa-f]{6}$")
+
+_DEFAULT_COLORS = {
+    "outer": "FF0000",
+    "middle": "00FF00",
+    "inner": "0000FF",
+}
+
+
+class ClockSession:
+    """Holds the clock's per-ring colors + mode + the polling task.
+
+    The async loop lives in ``start()`` / ``_run()`` (added Task 4).
+    Snapshot is JSON-serialisable for the /api/clock/state endpoint.
+    """
+
+    def __init__(self, client, colors: Optional[dict] = None, mode: str = "12h"):
+        if mode not in _VALID_MODES:
+            raise ValueError(f"mode must be one of {_VALID_MODES}; got {mode!r}")
+        merged = dict(_DEFAULT_COLORS)
+        if colors:
+            merged.update(colors)
+        for ring, value in merged.items():
+            if not _HEX6.match(value):
+                raise ValueError(f"colors[{ring!r}] = {value!r} is not a 6-hex string")
+        self._client = client
+        self._colors = merged
+        self._mode = mode
+        self._since: Optional[str] = None
+        self._task = None
+        self._last_displayed: Optional[str] = None
+
+    @property
+    def running(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+    def snapshot(self) -> dict:
+        return {
+            "running": self.running,
+            "since": self._since,
+            "mode": self._mode,
+            "colors": dict(self._colors),
+            "now_displayed": self._last_displayed,
+        }

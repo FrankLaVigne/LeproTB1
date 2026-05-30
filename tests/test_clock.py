@@ -114,3 +114,41 @@ def test_build_clock_leds_supports_last_positions():
     assert leds[87] == "FF0000"
     assert leds[149] == "00FF00"
     assert leds[195] == "0000FF"
+
+
+# --- ClockSession state tests -------------------------------------------------
+
+
+def test_clock_session_initial_snapshot_not_running():
+    sess = clock.ClockSession(client=None, colors=_colors(), mode="12h")
+    snap = sess.snapshot()
+    assert snap["running"] is False
+    assert snap["since"] is None
+    assert snap["mode"] == "12h"
+    assert snap["colors"] == _colors()
+    assert snap["now_displayed"] is None
+
+
+def test_clock_session_defaults_to_12h_with_red_green_blue():
+    # Constructing with no colors at all -> defaults.
+    sess = clock.ClockSession(client=None)
+    snap = sess.snapshot()
+    assert snap["mode"] == "12h"
+    assert snap["colors"] == {"outer": "FF0000", "middle": "00FF00", "inner": "0000FF"}
+
+
+def test_clock_session_rejects_bad_color():
+    with pytest.raises(ValueError):
+        clock.ClockSession(client=None,
+                            colors={"outer": "ZZZ", "middle": "00FF00", "inner": "0000FF"})
+
+
+def test_clock_session_rejects_bad_mode():
+    with pytest.raises(ValueError):
+        clock.ClockSession(client=None, mode="13h")
+
+
+def test_clock_session_snapshot_json_serialisable():
+    import json
+    sess = clock.ClockSession(client=None, colors=_colors(), mode="24h")
+    assert json.dumps(sess.snapshot())
