@@ -404,7 +404,8 @@ def _list_preset_names() -> list[str]:
 
 
 async def index(_req):
-    return web.Response(text=_PAGE, content_type="text/html")
+    return web.Response(text=_render_shell("presets", _PANEL_PRESETS, "Presets"),
+                        content_type="text/html")
 
 
 async def index_diy(_req):
@@ -1975,24 +1976,15 @@ async def index_state(_req):
     return web.Response(text=_PAGE_STATE, content_type="text/html")
 
 
-# Tiny placeholder page so smoke tests don't 500. Real UI inlined in Task 7.
-_PAGE = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lepro Presets</title>
+_PANEL_PRESETS = """
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { font: 15px/1.4 system-ui, sans-serif; margin: 0;
-         background: #111; color: #eee; min-height: 100vh; }
-  .wrap { display: grid; grid-template-columns: 320px 1fr; gap: 24px;
-          padding: 20px; max-width: 1100px; margin: 0 auto; }
-  @media (max-width: 760px) { .wrap { grid-template-columns: 1fr; } }
+  /* Feature-specific styles for the Presets panel.
+     Generic page chrome (body, .wrap, .tabs, .power-btns, .card, :root) lives in
+     /static/cockpit.css — those rules are intentionally omitted here. */
+
   h1 { font-size: 18px; margin: 0 0 16px; color: #5fd9d9; }
   h2 { font-size: 14px; margin: 16px 0 8px; color: #aaa;
        text-transform: uppercase; letter-spacing: 0.08em; }
-  .card { background: #1c1c1f; padding: 16px; border-radius: 14px;
-          box-shadow: 0 4px 16px rgba(0,0,0,.4); }
   .preset-row { display: flex; align-items: center; gap: 8px;
                 padding: 10px 12px; border-radius: 10px; cursor: pointer;
                 border: 1px solid transparent; }
@@ -2026,36 +2018,15 @@ _PAGE = """<!doctype html>
   button:disabled { opacity: .4; cursor: not-allowed; }
   #status { font-size: 12px; color: #777; margin-top: 12px; min-height: 1.2em; }
   .empty { color: #888; font-style: italic; padding: 20px; text-align: center; }
-  .header { display: flex; align-items: center; justify-content: space-between;
-            gap: 12px; margin-bottom: 8px; }
-  .header h1 { margin: 0; }
-  .power-btns { display: flex; gap: 6px; }
-  .power-btns button { padding: 6px 12px; font-size: 13px; }
-  .power-btns button.on { background: #2c8f4f; color: #fff; }
-  .power-btns button.off { background: #8f2c2c; color: #fff; }
-</style></head>
-<body><div class="wrap">
-  <div class="card">
-    <div class="header">
-      <div class="tabs">
-        <a href="/" class="active" style="color:#5fd9d9;background:#1f2a2a;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700">🎨 Presets</a>
-        <a href="/diy" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">✏️ DIY</a>
-        <a href="/ticker" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">📈 Ticker</a>
-        <a href="/state" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">📊 State</a>
-        <a href="/clock" style="color:#aaa;padding:6px 12px;border-radius:8px;text-decoration:none">⏰ Clock</a>
-      </div>
-      <div class="power-btns">
-        <button class="on" id="pwr-on">⏻ On</button>
-        <button class="off" id="pwr-off">⏻ Off</button>
-      </div>
-    </div>
-    <h2>Preset library</h2>
-    <div id="preset-list"></div>
-  </div>
-  <div class="card" id="editor">
-    <div class="empty">Pick an animation on the left to start.</div>
-  </div>
+</style>
+
+<h2>Preset library</h2>
+<div id="preset-list"></div>
+
+<div class="panel" id="editor" style="margin-top:16px">
+  <div class="empty">Pick an animation on the left to start.</div>
 </div>
+
 <script type="module">
 const $ = s => document.querySelector(s);
 const list = $('#preset-list');
@@ -2168,6 +2139,8 @@ async function doSave() {
 }
 
 // Power buttons live in the persistent header, wired once at page load.
+// cockpit.js handles these globally; this is a harmless double-bind kept for
+// backward compatibility — cleanup deferred to a later task.
 $('#pwr-on').onclick = async () => {
   const j = await api('/api/power', {on: true});
   $('#status') && ($('#status').textContent = j.ok ? 'lamp on' : 'error: ' + j.error);
@@ -2178,7 +2151,7 @@ $('#pwr-off').onclick = async () => {
 };
 
 loadPresets();
-</script></body></html>"""
+</script>"""
 
 
 async def _on_startup(app):
