@@ -217,7 +217,7 @@ effect it knows about." It's also the leverage point most projects miss.
    messages. **Your subscriber receives them too.** Log them, deduplicate by
    payload, and save the interesting ones.
 
-Concretely, my Lepro capture is a `cli.py capture --seconds 90` subcommand
+Concretely, my Lepro capture is a `python -m cli.main capture --seconds 90` subcommand
 that prints any `d50`/`d60`/`d5` field changes it sees. A 90-second window is
 usually enough to capture a full effect cycle.
 
@@ -285,11 +285,11 @@ For the TB1, this is what we did. The workflow:
 1. Open the Lepro app.
 2. Type a prompt into LightGPM (the in-app AI lighting designer):
    `"mars colors"`, `"Christmas"`, `"cyberpunk lighting"`, `"hulk"`.
-3. While the AI's effect plays, `cli.py capture` logs every distinct payload
-   the lamp emits.
+3. While the AI's effect plays, `python -m cli.main capture` logs every
+   distinct payload the lamp emits.
 4. Save as `presets/<name>.json`. Multi-frame captures become a list of
    frames; single-frame captures become a single payload.
-5. Replay anywhere, anytime: `play_preset.py <name>`.
+5. Replay anywhere, anytime: `python -m cli.play_preset <name>`.
 
 **The proprietary AI becomes your preset generator.** Type a phrase once;
 own the effect forever, callable from your code, the CLI, the web UI, or any
@@ -306,14 +306,17 @@ if you genuinely need parameterization.
 Once you have a working client + a way to capture, build the things that
 make it usable:
 
-- **A library / client class.** Mine is `lepro.py`; the analog for your
-  device will look similar (auth, MQTT, simple control methods).
-- **A CLI** for ad-hoc commands. Mine: `cli.py on / off / bright / color /
-  white / raw / capture`.
-- **A web UI** for non-coders. Mine: `app.py` (aiohttp, one persistent
-  connection, simple HTML page).
-- **An MCP server** so AI agents can drive the device. Mine: `mcp_server.py`
-  with FastMCP over streamable-HTTP and bearer-token auth.
+- **A library / client class.** Mine is the `lepro/` package (`LeproClient`
+  in `lepro/client.py`); the analog for your device will look similar (auth,
+  MQTT, simple control methods).
+- **A CLI** for ad-hoc commands. Mine: `python -m cli.main on / off /
+  bright / color / white / raw / capture`.
+- **A web UI** for non-coders. Mine: `python -m web.server` (aiohttp,
+  cockpit layout — lamp visualizer + power + brightness always visible on
+  the left, four feature tabs on the right).
+- **An MCP server** so AI agents can drive the device. Mine:
+  `python -m mcphost.server` with FastMCP over streamable-HTTP and
+  bearer-token auth.
 - **A presets directory** with one JSON file per captured effect. Each
   preset's filename becomes its name; an agent or user picks effects by name.
 
@@ -334,9 +337,9 @@ Phase-by-phase mapping for the worked example:
 | 3a | Used the reference integration's protocol. Region `na`, not `us`. |
 | 3b | Tried, hit SSL-pinning + Frida-bypass failures, abandoned. |
 | 4 | `LeproClient` (~250 lines). Login → profile → cert download → MQTT. Session cached to `certs/session.json`. Power, brightness, color, white temp all working. |
-| 5 | `cli.py capture --seconds 90`. Subscribed to `le/{did}/prp/#`. Triggered effects from the app. Captured payload formats not in the reference: `N02:`, `N03:`, `#V:`, `#I00/#I01/#I02:`, `P4` headers. |
+| 5 | `python -m cli.main capture --seconds 90`. Subscribed to `le/{did}/prp/#`. Triggered effects from the app. Captured payload formats not in the reference: `N02:`, `N03:`, `#V:`, `#I00/#I01/#I02:`, `P4` headers. |
 | 6 | Chose **replay** over decode. Built `presets/*.json` library; currently `mars_colors`, `christmas`, `cyberpunk`, `hulk`. |
-| 7 | `cli.py` + `app.py` + `mcp_server.py` + `presets/` + `play_preset.py`. |
+| 7 | `cli/` + `web/server.py` (cockpit) + `mcphost/server.py` + `presets/` + `cli/play_preset.py`. |
 
 ### The TB1 `d` field reference (what we've decoded)
 
@@ -359,8 +362,9 @@ own to fade a running pattern without re-publishing `d50`. Confirmed by
 sending `{"d52": 250}` then `{"d52": 750}` from code and observing dim → bright.
 
 > ⚠️ **Methodology lesson** (the kind that costs hours): make your capture
-> tool show *every* field by default, not a filtered subset. Our `cli.py
-> capture` was silently dropping `d3`/`d4`/`d52`/`d30` because we picked a
+> tool show *every* field by default, not a filtered subset. Our
+> `python -m cli.main capture` was silently dropping `d3`/`d4`/`d52`/`d30`
+> because we picked a
 > small "interesting" set early on. We didn't realize brightness lived in
 > `d52` for *weeks* because we never saw it. **If the tool can hide
 > information from you, sooner or later it will.**

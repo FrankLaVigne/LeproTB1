@@ -261,7 +261,7 @@ end-to-end**:
 ### Brightness lives in `d52` (segmented mode) — experimentally confirmed (2026-05-29)
 
 While testing whether the DIY app's brightness slider modifies the `d50`, we
-discovered our `cli.py capture` was silently filtering out everything except
+discovered our `python -m cli.main capture` was silently filtering out everything except
 `d2/d50/d60/d5`. A full unfiltered capture during a brightness experiment
 revealed:
 

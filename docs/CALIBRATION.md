@@ -93,8 +93,8 @@ not multiple markers across rings at once.
 
 ## How to apply the rotation in code
 
-The cleanest place is at the page→protocol boundary in `workshop.py` — i.e.,
-just before `build_d50_from_leds` is called by `api_diy_paint` and
+The cleanest place is at the page→protocol boundary in `web/server.py` —
+i.e., just before `build_d50_from_leds` is called by `api_diy_paint` and
 `api_diy_save`. A `apply_lamp_rotation(page_leds) -> physical_leds` helper
 keeps the d50 encoder itself protocol-pure.
 

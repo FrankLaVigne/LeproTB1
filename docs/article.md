@@ -303,7 +303,7 @@ presets/
 └── hulk.json          # 26-frame green/lime/brown rage cycle
 ```
 
-`python play_preset.py cyberpunk` reproduces the AI-designed cyberpunk
+`python -m cli.play_preset cyberpunk` reproduces the AI-designed cyberpunk
 animation perfectly. And every prompt I think of adds another permanent entry
 to the library — each one takes about a minute to capture and lives in the
 repo as a small JSON file that anyone can replay.
