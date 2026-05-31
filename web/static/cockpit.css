@@ -121,6 +121,7 @@ button { font: inherit; cursor: pointer; }
   .viz-wrap { width: 200px; height: 200px; }
 }
 .viz-wrap svg .seg { transition: fill 0.3s; }
+.viz-wrap.viz-dimmed { opacity: 0.25; transition: opacity 0.2s; }
 
 .active-banner {
   background: var(--accent-soft);

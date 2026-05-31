@@ -100,10 +100,32 @@ async function refreshLampState() {
         $('#brightness-slider').value = pct;
         $('#brightness-val').textContent = pct + '%';
       }
+      // Reconcile optimistic UI with the lamp's actual power state.
+      const wrap = $('.viz-wrap');
+      if (wrap) wrap.classList.toggle('viz-dimmed', fields.d1 === 0);
     }
     const pageLeds = lampStateToPageLeds(j);
     drawViz(pageLeds);
   } catch (e) { /* silent — keep stale viz on transient failure */ }
+}
+
+// === Optimistic UI + burst polling =========================================
+
+// Apply an immediate visual change so the user sees feedback at click time,
+// before the round-trip through MQTT lands. The next refreshLampState() will
+// reconcile if the lamp didn't actually do what we asked.
+function optimisticPower(on) {
+  const wrap = $('.viz-wrap');
+  if (wrap) wrap.classList.toggle('viz-dimmed', !on);
+  $('#active-banner-value').textContent = on ? '✨ Idle' : '⏻ Off';
+}
+
+// After a user action, poll a few times at sub-second intervals so the UI
+// catches the lamp's echo without waiting for the next 2-second tick.
+function burstRefresh() {
+  for (const ms of [250, 600, 1200]) {
+    setTimeout(() => { refreshLampState(); refreshActiveBanner(); }, ms);
+  }
 }
 
 // === Polling: active mode ==================================================
@@ -147,14 +169,14 @@ async function sendBrightness(pct) {
 // === Power buttons =========================================================
 
 async function postPower(on) {
+  optimisticPower(on);   // immediate visual feedback — reconciled by burstRefresh
   try {
     await fetch('/api/power', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({on}),
     });
-    refreshLampState();
-    refreshActiveBanner();
+    burstRefresh();
   } catch (e) { /* silent */ }
 }
 
