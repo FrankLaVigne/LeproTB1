@@ -64,20 +64,6 @@ Every runnable script is a Python module: launch with `python -m <pkg>.<mod>`.
 
 Add `--did <id>` to target a specific light (default: the first one discovered).
 
-## Web front end
-
-```bash
-.venv/bin/python -m web.server        # serves on 0.0.0.0:8081
-```
-
-Open `http://<your-vm-ip>:8081`. Five tabs: Presets / DIY / Ticker / State /
-Clock. Override the bind address with `LEPRO_WORKSHOP_HOST` /
-`LEPRO_WORKSHOP_PORT`.
-
-The legacy single-page demo from earlier in the project lives at
-`web/legacy.py` (`python -m web.legacy`) — preserved for reference; not
-recommended for daily use.
-
 ## MCP server
 
 Expose the lamp to AI agents (OpenClaw, Claude Desktop/Code, any MCP client) over
