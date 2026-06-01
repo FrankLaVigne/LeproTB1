@@ -136,7 +136,7 @@ Open `http://<vm-ip>:8081`. The interface is a single "cockpit" layout:
   what the lamp is currently showing), the active-mode banner (Idle / Off /
   Preset / Ticker / Clock), power on/off, brightness slider (0-100 %), and
   a collapsible diagnostics drawer with the raw d-field values.
-- **Right panel:** four tabs.
+- **Right panel:** five tabs.
   - **🎨 Presets** — browse / recolor / preview / save captured presets
     (`presets/*.json`). Click Preview to loop the preset on the lamp.
   - **✏️ DIY** — click-to-paint 3-ring SVG canvas; Draw / Fill / Erase /
@@ -150,6 +150,12 @@ Open `http://<vm-ip>:8081`. The interface is a single "cockpit" layout:
   - **⏰ Clock** — three-handed analog clock (outer = seconds, middle =
     minutes, inner = hours), per-ring configurable colors, 12 h / 24 h
     toggle, 1-second cadence.
+  - **🎞 Animations** — the deduped catalog of motion patterns derived from
+    your `presets/*.json` library. Click a row to pick new colors and save
+    the result as a new preset. Useful when you've captured the same
+    Lepro-AI prompt twice with different palettes and want to see they're
+    the same motion underneath. Manual rename and merge available via
+    `animations.json` (gitignored, written by the tab's UI).
 
 While the ticker or clock is running, the DIY paint and the Presets-page
 preview endpoint return HTTP 409. Power off stops every active driver
