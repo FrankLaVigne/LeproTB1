@@ -169,3 +169,87 @@ def test_capture_session_record_frame_ignores_none_and_empty():
 def test_capture_session_running_reflects_task_state():
     sess = captures.CaptureSession(client=None, baseline_d50=None)
     assert sess.running is False
+
+
+# --- CaptureSession async loop ----------------------------------------------
+
+
+import asyncio
+
+
+class _FakeClient:
+    """Lets us prime the lamp's reported state for capture tests."""
+
+    def __init__(self, did: str = "abc"):
+        self.state = {did: {"d50": None}}
+        self.did = did
+
+    def set_d50(self, d50):
+        self.state[self.did]["d50"] = d50
+
+
+@pytest.mark.asyncio
+async def test_tick_once_records_new_d50():
+    client = _FakeClient()
+    sess = captures.CaptureSession(client=client, baseline_d50=None)
+    client.set_d50("frame-a")
+    sess._tick_once()
+    assert sess.frames == ["frame-a"]
+
+
+@pytest.mark.asyncio
+async def test_tick_once_ignores_baseline():
+    client = _FakeClient()
+    sess = captures.CaptureSession(client=client, baseline_d50="base")
+    client.set_d50("base")
+    sess._tick_once()
+    assert sess.frames == []
+
+
+@pytest.mark.asyncio
+async def test_tick_once_appends_only_distinct_values():
+    client = _FakeClient()
+    sess = captures.CaptureSession(client=client, baseline_d50=None)
+    for d50 in ["a", "a", "b", "b", "c"]:
+        client.set_d50(d50)
+        sess._tick_once()
+    assert sess.frames == ["a", "b", "c"]
+
+
+@pytest.mark.asyncio
+async def test_start_then_stop_lifecycle():
+    client = _FakeClient()
+    sess = captures.CaptureSession(client=client, baseline_d50=None)
+    assert sess.running is False
+    await sess.start()
+    assert sess.running is True
+    await sess.stop()
+    assert sess.running is False
+
+
+@pytest.mark.asyncio
+async def test_idle_timeout_fires_when_no_frames():
+    # With a tiny idle_timeout we can verify auto-stop without sleeping forever.
+    client = _FakeClient()
+    sess = captures.CaptureSession(client=client, baseline_d50=None,
+                                    idle_timeout=0.3, hard_cap=10.0)
+    await sess.start()
+    # Don't change client.set_d50 — no frames will be recorded.
+    await asyncio.sleep(0.7)
+    assert sess.running is False
+    assert sess.frames == []
+
+
+@pytest.mark.asyncio
+async def test_hard_cap_fires_even_with_steady_frames():
+    # Tiny hard cap + a frame stream that keeps the idle timer fresh.
+    client = _FakeClient()
+    sess = captures.CaptureSession(client=client, baseline_d50=None,
+                                    idle_timeout=10.0, hard_cap=0.5)
+    await sess.start()
+    # Pump distinct frames so the idle-timeout WOULD never fire.
+    for i in range(10):
+        client.set_d50(f"frame-{i}")
+        await asyncio.sleep(0.1)
+    await asyncio.sleep(0.3)
+    assert sess.running is False

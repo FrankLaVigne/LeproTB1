@@ -143,3 +143,61 @@ class CaptureSession:
             "auto_stop_at": auto_stop,
             "default_name": default_name,
         }
+
+    def _tick_once(self) -> None:
+        """One poll iteration: read the lamp's current d50, maybe record it."""
+        if self._client is None:
+            return
+        state = getattr(self._client, "state", {}) or {}
+        if not state:
+            return
+        # Use the first device; the workshop only ever has one lamp anyway.
+        first = next(iter(state.values()), None)
+        if not first:
+            return
+        self.record_frame(first.get("d50"))
+
+    def _should_auto_stop(self) -> bool:
+        if self._started_at is None:
+            return False
+        now = datetime.now()
+        if (now - self._started_at).total_seconds() >= self._hard_cap:
+            return True
+        # Idle reference: last accepted frame, or session start if no frames yet.
+        idle_ref = self._last_frame_at if self._last_frame_at is not None else self._started_at
+        if (now - idle_ref).total_seconds() >= self._idle_timeout:
+            return True
+        return False
+
+    async def start(self) -> None:
+        """Begin the polling loop. No-op if already running."""
+        import asyncio
+        if self.running:
+            return
+        self._started_at = datetime.now()
+        loop = asyncio.get_running_loop()
+        self._task = loop.create_task(self._run())
+
+    async def _run(self) -> None:
+        """The 200ms poll loop, until auto-stop or cancelled."""
+        import asyncio
+        try:
+            while True:
+                self._tick_once()
+                if self._should_auto_stop():
+                    return
+                await asyncio.sleep(0.2)
+        except asyncio.CancelledError:
+            return
+
+    async def stop(self) -> None:
+        """Stop the loop. Preserves the collected frames so the caller
+        can still build a preset from them."""
+        import asyncio
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+            self._task = None
