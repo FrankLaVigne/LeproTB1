@@ -103,6 +103,44 @@ def _sanitize_name(name: str) -> str:
     return name
 
 
+def _recolor_preset(preset: dict, old_palette: list, new_palette: list) -> dict:
+    """Return a deep copy of ``preset`` with palette colors mapped old → new.
+
+    Only the P1000<N><colors> section of each frame's d50 is modified;
+    motion/length/effect fields are untouched. The mapping is positional:
+    ``old_palette[i]`` → ``new_palette[i]``.
+    """
+    out = copy.deepcopy(preset)
+    if len(old_palette) != len(new_palette):
+        raise ValueError("palette length mismatch")
+    mapping = {old.upper(): new.upper() for old, new in zip(old_palette, new_palette)}
+
+    def remap_d50(d50: str) -> str:
+        if not d50:
+            return d50
+        m = re.search(r"P1000(\d)([0-9A-Fa-f]+)", d50)
+        if not m:
+            return d50
+        n = int(m.group(1))
+        head = d50[:m.end(1)]   # everything up to and including the count digit
+        original = m.group(2)
+        block = original[:n * 6]
+        tail = d50[m.end(1) + len(block):]
+        # Map each 6-hex slot through the mapping.
+        new_block = ""
+        for i in range(n):
+            slot = block[i * 6:i * 6 + 6].upper()
+            new_block += mapping.get(slot, slot)
+        return head + new_block + tail
+
+    if "frames" in out:
+        for f in out.get("frames") or []:
+            f["d50"] = remap_d50(f.get("d50", ""))
+    elif "payload" in out:
+        out["payload"]["d50"] = remap_d50(out["payload"].get("d50", ""))
+    return out
+
+
 _DEFAULT_FRAME_DURATION_MS = 2500
 
 # Segment → LED-range mapping for the DIY canvas's 48-mode display.
@@ -291,6 +329,52 @@ _LOG = logging.getLogger("workshop")
 _HERE = Path(__file__).resolve().parent
 _PROJECT_ROOT = _HERE.parent  # repo root, parent of the web/ package
 _PRESETS_DIR = _PROJECT_ROOT / "presets"
+
+# --- Animations tab — see docs/superpowers/specs/2026-06-01-animations-tab-design.md
+from web import animations as _animations_mod
+
+_ANIMATIONS_OVERRIDES_PATH = _PROJECT_ROOT / "animations.json"
+
+
+def _read_animation_overrides() -> dict:
+    """Read animations.json if it exists, return {} otherwise."""
+    if not _ANIMATIONS_OVERRIDES_PATH.exists():
+        return {}
+    try:
+        return json.loads(_ANIMATIONS_OVERRIDES_PATH.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _write_animation_overrides(d: dict) -> None:
+    _ANIMATIONS_OVERRIDES_PATH.write_text(json.dumps(d, indent=2) + "\n")
+
+
+def _grouped_animations() -> list:
+    """Return the override-applied list of Animation groups."""
+    groups = _animations_mod.group_presets(_PRESETS_DIR)
+    return _animations_mod.apply_overrides(groups, _read_animation_overrides())
+
+
+def _animation_to_json(anim) -> dict:
+    return {
+        "id": anim.id,
+        "name": anim.name,
+        "default_palette": anim.default_palette,
+        "members": [
+            {"name": m.name, "palette": m.palette, "frame_stats": m.frame_stats}
+            for m in anim.members
+        ],
+    }
+
+
+async def index_animations(_req):
+    return web.Response(text=_render_shell("animations", _PANEL_ANIMATIONS, "Animations"),
+                        content_type="text/html")
+
+
+# Replaced by the real UI in Task 6.
+_PANEL_ANIMATIONS = "<p>animations panel loading...</p>"
 
 # ---------------------------------------------------------------------------
 # Cockpit shell — shared layout for every page. See
@@ -1375,6 +1459,86 @@ async def index_clock(_req):
                         content_type="text/html")
 
 
+# --- Animations API endpoints -------------------------------------------------
+
+
+async def api_animations(_req):
+    """Return the deduped + override-applied animation catalog."""
+    groups = _grouped_animations()
+    return web.json_response({"animations": [_animation_to_json(g) for g in groups]})
+
+
+async def api_animation_rename(req):
+    """Set a custom display name for an animation group."""
+    aid = req.match_info["id"]
+    try:
+        body = await req.json()
+        name = str(body.get("name") or "").strip()
+        if not name:
+            return web.json_response({"ok": False, "error": "name required"}, status=400)
+        overrides = _read_animation_overrides()
+        entry = overrides.setdefault(aid, {})
+        entry["name"] = name
+        _write_animation_overrides(overrides)
+        return web.json_response({"ok": True})
+    except (ValueError, KeyError, TypeError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+async def api_animation_merge(req):
+    """Declare animation {id} as an alias of {other_id}; the two groups fold into one."""
+    aid = req.match_info["id"]
+    target = req.match_info["other_id"]
+    if aid == target:
+        return web.json_response({"ok": False, "error": "cannot merge into self"}, status=400)
+    overrides = _read_animation_overrides()
+    entry = overrides.setdefault(aid, {})
+    entry["alias_of"] = target
+    _write_animation_overrides(overrides)
+    return web.json_response({"ok": True})
+
+
+async def api_animation_save(req):
+    """Recolor an animation's default preset with a user-supplied palette
+    and save the result as a new file in presets/."""
+    aid = req.match_info["id"]
+    try:
+        body = await req.json()
+        name = _sanitize_name(body["name"])
+        palette = list(body.get("palette") or [])
+        groups = _grouped_animations()
+        anim = next((g for g in groups if g.id == aid), None)
+        if anim is None:
+            return web.json_response({"ok": False, "error": f"animation {aid!r} not found"}, status=404)
+        if len(palette) != len(anim.default_palette):
+            return web.json_response(
+                {"ok": False,
+                 "error": f"palette length {len(palette)} != animation palette length {len(anim.default_palette)}"},
+                status=400)
+        for c in palette:
+            if not _HEX6.match(c):
+                return web.json_response({"ok": False, "error": f"color {c!r} is not 6-hex"}, status=400)
+        # Source preset: the first member's file on disk.
+        source_name = anim.members[0].name
+        source_path = _PRESETS_DIR / f"{source_name}.json"
+        if not source_path.exists():
+            return web.json_response({"ok": False, "error": f"source preset {source_name} missing"}, status=500)
+        source = json.loads(source_path.read_text())
+        recolored = _recolor_preset(source, anim.default_palette, palette)
+        recolored["name"] = name
+        recolored["description"] = f"Recolored variant of {source_name} via Animations tab."
+        recolored["prompt"] = f"animations:{aid}"
+        from datetime import date
+        recolored["captured"] = date.today().isoformat()
+        out_path = _PRESETS_DIR / f"{name}.json"
+        if out_path.exists():
+            return web.json_response({"ok": False, "error": f"preset {name!r} already exists"}, status=400)
+        out_path.write_text(json.dumps(recolored, indent=2) + "\n")
+        return web.json_response({"ok": True, "path": str(out_path.relative_to(_PROJECT_ROOT))})
+    except (KeyError, ValueError, TypeError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
 _PANEL_CLOCK = """
 <style>
   /* Feature-specific styles for the Clock panel.
@@ -1858,6 +2022,11 @@ def build_app() -> web.Application:
         web.post("/api/clock/start", api_clock_start),
         web.post("/api/clock/stop", api_clock_stop),
         web.get("/api/clock/state", api_clock_state),
+        web.get("/animations", index_animations),
+        web.get("/api/animations", api_animations),
+        web.post(r"/api/animations/{id}/rename", api_animation_rename),
+        web.post(r"/api/animations/{id}/merge_into/{other_id}", api_animation_merge),
+        web.post(r"/api/animations/{id}/save", api_animation_save),
     ])
     # Static assets — currently just lamp-utils.js shared by /diy and /state.
     app.router.add_static("/static", _HERE / "static")
