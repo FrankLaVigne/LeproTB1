@@ -253,3 +253,78 @@ async def test_hard_cap_fires_even_with_steady_frames():
         await asyncio.sleep(0.1)
     await asyncio.sleep(0.3)
     assert sess.running is False
+
+
+# --- HTTP layer -------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_api_captures_save_with_no_frames_returns_400(tmp_path, monkeypatch):
+    """If a capture exists but has zero frames, save returns 400."""
+    from web import server as workshop
+
+    monkeypatch.setattr(workshop, "_PRESETS_DIR", tmp_path)
+    monkeypatch.setattr(workshop, "_PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(workshop, "_ANIMATIONS_OVERRIDES_PATH", tmp_path / "animations.json")
+
+    sess = captures.CaptureSession(client=None, baseline_d50=None)
+    # Don't start the loop — directly inject the session as if mid-capture.
+    workshop._capture_session = sess
+
+    class _Req:
+        async def json(self):
+            return {"name": "x"}
+
+    try:
+        resp = await workshop.api_captures_save(_Req())
+        body = json.loads(resp.body.decode() if isinstance(resp.body, bytes) else resp.body)
+        assert body["ok"] is False
+        assert "no frames" in body["error"]
+    finally:
+        workshop._capture_session = None
+
+
+@pytest.mark.asyncio
+async def test_api_captures_save_writes_preset_and_reports_matched_animation(tmp_path, monkeypatch):
+    """A capture with frames writes a file and surfaces matched_animation
+    when the new preset's fingerprint matches an existing group."""
+    from web import server as workshop
+
+    monkeypatch.setattr(workshop, "_PRESETS_DIR", tmp_path)
+    monkeypatch.setattr(workshop, "_PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(workshop, "_ANIMATIONS_OVERRIDES_PATH", tmp_path / "animations.json")
+
+    # Pre-populate an existing preset with a known d50 so the new save
+    # fingerprints as a match.
+    existing = {"name": "existing",
+                "payload": {"d50": "N01:P10001FF0000F21000100C4U3V3000640000E1;"}}
+    (tmp_path / "existing.json").write_text(json.dumps(existing))
+
+    # Build a CaptureSession that has the same d50 in its frames.
+    sess = captures.CaptureSession(client=None, baseline_d50=None)
+    sess.record_frame("N01:P10001FF0000F21000100C4U3V3000640000E1;")
+    workshop._capture_session = sess
+
+    class _Req:
+        async def json(self):
+            return {"name": "newone"}
+
+    try:
+        resp = await workshop.api_captures_save(_Req())
+        body = json.loads(resp.body.decode() if isinstance(resp.body, bytes) else resp.body)
+        assert body["ok"] is True, body
+        assert (tmp_path / "newone.json").exists()
+        assert body["matched_animation"] is not None
+        assert body["matched_animation"]["variant_count"] == 2
+    finally:
+        workshop._capture_session = None
+
+
+@pytest.mark.asyncio
+async def test_api_captures_cancel_is_idempotent(tmp_path, monkeypatch):
+    """Cancel always returns ok, even with no active session."""
+    from web import server as workshop
+    workshop._capture_session = None  # ensure clean state
+    resp = await workshop.api_captures_cancel(None)
+    body = json.loads(resp.body.decode() if isinstance(resp.body, bytes) else resp.body)
+    assert body["ok"] is True
