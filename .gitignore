@@ -6,4 +6,3 @@ __pycache__/
 *.pyc
 snapshot.json
 .superpowers/
-animations.json
