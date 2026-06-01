@@ -402,3 +402,67 @@ button { font: inherit; cursor: pointer; }
 
 #anim-empty { color: var(--text-dim); text-align: center; padding: var(--gap-xl); font-style: italic; }
 #anim-status { font-size: 12px; color: var(--text-dim); margin-top: var(--gap); min-height: 1.2em; }
+
+/* === Animations: capture bar ============================================= */
+
+.capture-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: var(--gap);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: var(--gap);
+}
+.capture-counter {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.capture-counter strong { color: var(--text); font-weight: 700; }
+
+#capture-btn,
+.capture-action {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-hi);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-weight: 600;
+}
+#capture-btn:hover,
+.capture-action:hover { background: var(--accent-soft); color: var(--accent); }
+#capture-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(0, 221, 255, 0.4);
+}
+
+.capture-saveform {
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+  margin-top: var(--gap-sm);
+  padding-top: var(--gap-sm);
+  border-top: 1px solid var(--border);
+}
+.capture-saveform input[type=text] {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-hi);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  font: inherit;
+}
+.capture-notice {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: var(--gap-sm);
+  min-height: 1.2em;
+}
+.capture-notice.ok { color: var(--ok); }
+.capture-notice.matched { color: var(--accent); }
+.capture-notice.err { color: var(--danger); }

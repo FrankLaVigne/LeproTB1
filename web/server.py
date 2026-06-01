@@ -485,11 +485,24 @@ async def api_captures_save(req):
 
 # Replaced by the real UI in Task 6.
 _PANEL_ANIMATIONS = """
+<div class="capture-bar">
+  <div class="capture-counter">
+    <strong id="capture-count">—</strong> unique animations / ~72 target
+  </div>
+  <button id="capture-btn" class="capture-action">🎥 Capture</button>
+</div>
+<div id="capture-saveform" class="capture-saveform" style="display:none">
+  <input type="text" id="capture-name" placeholder="capture-...">
+  <button class="capture-action" id="capture-save">💾 Save</button>
+  <button class="capture-action" id="capture-discard">Discard</button>
+</div>
+<div id="capture-notice" class="capture-notice"></div>
+
 <div id="anim-list"></div>
 <div id="anim-empty" style="display:none">
-  No animations yet. Capture some via
-  <code>python -m cli.main capture --seconds 90</code>
-  and they'll appear here grouped by motion pattern.
+  No animations yet. Use the Capture button above (or
+  <code>python -m cli.main capture --seconds 90</code>) and they'll appear
+  here grouped by motion pattern.
 </div>
 <div id="anim-status"></div>
 
@@ -498,10 +511,23 @@ const $ = s => document.querySelector(s);
 const list = $('#anim-list');
 const empty = $('#anim-empty');
 const status = $('#anim-status');
+const captureBtn = $('#capture-btn');
+const captureCount = $('#capture-count');
+const saveForm = $('#capture-saveform');
+const nameInput = $('#capture-name');
+const notice = $('#capture-notice');
+
+const TARGET_TOTAL = 72;
+let pollTimer = null;
 
 function setStatus(msg, isError) {
   status.textContent = msg || '';
   status.style.color = isError ? 'var(--danger)' : '';
+}
+
+function setNotice(msg, cls) {
+  notice.className = 'capture-notice' + (cls ? ' ' + cls : '');
+  notice.textContent = msg || '';
 }
 
 async function postJSON(path, body) {
@@ -524,7 +550,6 @@ function buildRow(anim) {
     ? `${firstStats.total} frames (${firstStats.unique} unique)`
     : `${firstStats.total} frame`;
 
-  // Build expanded recolor form.
   const pickerInputs = anim.default_palette.map((c, i) =>
     `<input type="color" value="#${c}" data-idx="${i}">`).join('');
   const variantPills = anim.members.map(m =>
@@ -574,18 +599,15 @@ function buildRow(anim) {
 }
 
 function attachHandlers(row, anim) {
-  // Toggle expansion.
   for (const el of row.querySelectorAll('[data-action="toggle"]')) {
     el.addEventListener('click', () => row.classList.toggle('expanded'));
   }
-  // Play: previews the first member preset on the lamp via existing /api/preview.
   row.querySelector('[data-action="play"]').addEventListener('click', async (e) => {
     e.stopPropagation();
     const sourceName = anim.members[0].name;
     const j = await postJSON('/api/preview', {base_name: sourceName});
     setStatus(j.ok === false ? ('error: ' + j.error) : `playing ${sourceName}…`, j.ok === false);
   });
-  // Rename.
   row.querySelector('[data-action="rename"]').addEventListener('click', async () => {
     const name = row.querySelector('[data-role="rename"]').value.trim();
     if (!name) { setStatus('name required', true); return; }
@@ -594,7 +616,6 @@ function attachHandlers(row, anim) {
     setStatus(`renamed to ${name}`);
     await loadAnimations();
   });
-  // Save (recolor).
   row.querySelector('[data-action="save"]').addEventListener('click', async () => {
     const newName = row.querySelector('[data-role="save-name"]').value.trim();
     if (!newName) { setStatus('save name required', true); return; }
@@ -615,6 +636,7 @@ async function loadAnimations() {
     const j = await r.json();
     list.innerHTML = '';
     const items = j.animations || [];
+    captureCount.textContent = items.length;
     if (items.length === 0) {
       empty.style.display = 'block';
       return;
@@ -630,7 +652,97 @@ async function loadAnimations() {
   }
 }
 
+// --- capture flow ----------------------------------------------------------
+
+function setCaptureButtonRunning(running, frameCount) {
+  if (running) {
+    captureBtn.classList.add('active');
+    captureBtn.textContent = `Capturing... ${frameCount} frame${frameCount === 1 ? '' : 's'}`;
+  } else {
+    captureBtn.classList.remove('active');
+    captureBtn.textContent = '🎥 Capture';
+  }
+}
+
+async function startCapture() {
+  setNotice('');
+  saveForm.style.display = 'none';
+  const j = await postJSON('/api/captures/start', {});
+  if (j.ok === false) { setNotice('error: ' + j.error, 'err'); return; }
+  setCaptureButtonRunning(true, 0);
+  pollCaptureState();
+}
+
+async function pollCaptureState() {
+  try {
+    const r = await fetch('/api/captures/state');
+    const j = await r.json();
+    if (j.running) {
+      setCaptureButtonRunning(true, j.frame_count);
+      pollTimer = setTimeout(pollCaptureState, 500);
+    } else {
+      setCaptureButtonRunning(false, 0);
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+      // If a previous capture finished and we have frames + a default
+      // name, surface the save form. Server side: state-not-running with
+      // frame_count == 0 means there's nothing to save.
+      if (j.frame_count > 0 && j.default_name) {
+        nameInput.value = j.default_name;
+        saveForm.style.display = 'flex';
+      }
+    }
+  } catch (e) {
+    setNotice('lost connection to server while polling capture state', 'err');
+  }
+}
+
+async function submitSave() {
+  const name = nameInput.value.trim();
+  if (!name) { setNotice('name required', 'err'); return; }
+  const j = await postJSON('/api/captures/save', {name});
+  if (j.ok === false) { setNotice('error: ' + j.error, 'err'); return; }
+  saveForm.style.display = 'none';
+  if (j.matched_animation) {
+    const m = j.matched_animation;
+    setNotice(`Saved as ${name} → matches ${m.name} (now ${m.variant_count} variants)`, 'matched');
+  } else {
+    setNotice(`Saved as ${name} → new animation`, 'ok');
+  }
+  await loadAnimations();
+}
+
+async function cancelCapture() {
+  await postJSON('/api/captures/cancel', {});
+  setCaptureButtonRunning(false, 0);
+  saveForm.style.display = 'none';
+  setNotice('capture discarded');
+}
+
+captureBtn.addEventListener('click', () => {
+  if (captureBtn.classList.contains('active')) {
+    // Already capturing — treat as Save Now: pretend the user clicked the
+    // button while the loop's still alive. Stop polling, then surface the
+    // save form right away with a placeholder name; the user can finalise +
+    // click Save (the server will stop the loop itself before saving).
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+    fetch('/api/captures/state').then(r => r.json()).then(j => {
+      if (j.frame_count > 0 && j.default_name) {
+        nameInput.value = j.default_name;
+        saveForm.style.display = 'flex';
+        setCaptureButtonRunning(false, 0);
+      }
+    });
+  } else {
+    startCapture();
+  }
+});
+$('#capture-save').addEventListener('click', submitSave);
+$('#capture-discard').addEventListener('click', cancelCapture);
+
 loadAnimations();
+// On page mount, check if a capture is already in flight (so reloading
+// the tab while capturing doesn't lose track of it).
+pollCaptureState();
 </script>
 """
 
