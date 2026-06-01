@@ -328,3 +328,40 @@ async def test_api_captures_cancel_is_idempotent(tmp_path, monkeypatch):
     resp = await workshop.api_captures_cancel(None)
     body = json.loads(resp.body.decode() if isinstance(resp.body, bytes) else resp.body)
     assert body["ok"] is True
+
+
+def test_capture_session_snapshot_dodges_existing_default_names():
+    """If presets/capture-X-1.json exists, the default_name should be -2."""
+    existing = {"capture-2026-06-01-1432-1"}
+    sess = captures.CaptureSession(
+        client=None, baseline_d50=None,
+        existing_names_provider=lambda: existing,
+    )
+    sess._started_at = datetime(2026, 6, 1, 14, 32, 0)
+    # Add a frame so the snapshot's started_at branch is exercised.
+    sess.record_frame("any-d50-value")
+    snap = sess.snapshot()
+    assert snap["default_name"] == "capture-2026-06-01-1432-2"
+
+
+@pytest.mark.asyncio
+async def test_api_captures_start_refuses_when_unsaved_frames_present(monkeypatch):
+    """A stopped-but-unsaved session blocks a new start with a clear message."""
+    from web import server as workshop
+
+    # Inject a stopped session with frames into the module global.
+    stale = captures.CaptureSession(client=None, baseline_d50=None)
+    stale.record_frame("frame-a")  # frame_count = 1, but running = False
+    workshop._capture_session = stale
+    monkeypatch.setattr(workshop, "_ticker_session", None)
+    monkeypatch.setattr(workshop, "_clock_session", None)
+    monkeypatch.setattr(workshop, "_preview_task", None)
+
+    try:
+        resp = await workshop.api_captures_start(None)
+        body = json.loads(resp.body.decode() if isinstance(resp.body, bytes) else resp.body)
+        assert resp.status == 409
+        assert body["ok"] is False
+        assert "unsaved frames" in body["error"]
+    finally:
+        workshop._capture_session = None

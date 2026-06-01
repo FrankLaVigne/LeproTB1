@@ -89,8 +89,10 @@ class CaptureSession:
 
     def __init__(self, client, baseline_d50: Optional[str],
                  idle_timeout: float = _IDLE_TIMEOUT_S,
-                 hard_cap: float = _HARD_CAP_S):
+                 hard_cap: float = _HARD_CAP_S,
+                 existing_names_provider=None):
         self._client = client
+        self._existing_names_provider = existing_names_provider or (lambda: set())
         self._baseline_d50 = baseline_d50
         self._idle_timeout = idle_timeout
         self._hard_cap = hard_cap
@@ -135,7 +137,8 @@ class CaptureSession:
             else:
                 auto_stop_ts = hard_cap_at
             auto_stop = datetime.fromtimestamp(auto_stop_ts).isoformat(timespec="seconds")
-            default_name = auto_capture_name(self._started_at, existing_names=set())
+            default_name = auto_capture_name(self._started_at,
+                                              existing_names=self._existing_names_provider())
         return {
             "running": self.running,
             "started_at": self._started_at.isoformat(timespec="seconds") if self._started_at else None,

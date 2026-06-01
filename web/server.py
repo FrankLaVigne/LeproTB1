@@ -407,6 +407,13 @@ async def api_captures_start(_req):
         return web.json_response(
             {"ok": False, "error": "a capture is already in progress"},
             status=409)
+    # If the previous capture auto-stopped but the user hasn't saved or
+    # cancelled it yet, refuse to overwrite the unsaved frames.
+    if _capture_session is not None and not _capture_session.running \
+            and _capture_session.frame_count > 0:
+        return web.json_response(
+            {"ok": False, "error": "previous capture has unsaved frames; save or discard it first"},
+            status=409)
     # Baseline: whatever the lamp's d50 is right now. Anything that DIFFERS
     # from this baseline becomes a recorded frame.
     baseline = None
@@ -414,7 +421,13 @@ async def api_captures_start(_req):
         for fields in _client.state.values():
             baseline = fields.get("d50")
             break
-    sess = _captures_mod.CaptureSession(_client, baseline_d50=baseline)
+    def _existing_preset_names():
+        try:
+            return {p.stem for p in _PRESETS_DIR.glob("*.json")}
+        except OSError:
+            return set()
+    sess = _captures_mod.CaptureSession(_client, baseline_d50=baseline,
+                                         existing_names_provider=_existing_preset_names)
     await sess.start()
     _capture_session = sess
     return web.json_response({"ok": True, "started_at": sess.snapshot()["started_at"]})
@@ -720,16 +733,22 @@ async function cancelCapture() {
 
 captureBtn.addEventListener('click', () => {
   if (captureBtn.classList.contains('active')) {
-    // Already capturing — treat as Save Now: pretend the user clicked the
-    // button while the loop's still alive. Stop polling, then surface the
-    // save form right away with a placeholder name; the user can finalise +
-    // click Save (the server will stop the loop itself before saving).
+    // Already capturing — treat as Save Now: stop polling, then check the
+    // current state. If we have frames, surface the save form. If we have
+    // zero frames (nothing to save), resume polling so the user isn't
+    // stranded with a stuck button.
     if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
     fetch('/api/captures/state').then(r => r.json()).then(j => {
       if (j.frame_count > 0 && j.default_name) {
         nameInput.value = j.default_name;
         saveForm.style.display = 'flex';
         setCaptureButtonRunning(false, 0);
+      } else {
+        // No frames yet — keep capturing; resume polling so the button
+        // and counter stay live. User can still trigger an animation in
+        // the Lepro app, or just wait for the idle/cap auto-stop.
+        setNotice('No frames yet — trigger an animation in the Lepro app, or wait', '');
+        pollCaptureState();
       }
     });
   } else {
