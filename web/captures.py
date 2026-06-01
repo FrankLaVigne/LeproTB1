@@ -13,6 +13,7 @@ rationale for the timing constants.
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Optional
 
 
 def dedup_consecutive(frames: list) -> list:
@@ -72,3 +73,73 @@ def build_capture_preset(frames: list, name: str) -> dict:
     if len(frames) == 1:
         return {**common, "payload": {"d1": 1, "d2": 2, "d50": frames[0]}}
     return {**common, "frames": [{"d1": 1, "d2": 2, "d50": d} for d in frames]}
+
+
+_IDLE_TIMEOUT_S = 6.0   # auto-stop after this many seconds without a new frame
+_HARD_CAP_S = 90.0      # absolute cap regardless of activity
+
+
+class CaptureSession:
+    """One in-flight capture window: polls the lamp's d50 over MQTT,
+    collects distinct frames, auto-stops on idle gap or hard cap.
+
+    The polling loop lives in ``start()`` / ``_run()`` (added in Task 5).
+    State + snapshot here are exercised by the routes synchronously.
+    """
+
+    def __init__(self, client, baseline_d50: Optional[str],
+                 idle_timeout: float = _IDLE_TIMEOUT_S,
+                 hard_cap: float = _HARD_CAP_S):
+        self._client = client
+        self._baseline_d50 = baseline_d50
+        self._idle_timeout = idle_timeout
+        self._hard_cap = hard_cap
+        self._frames: list = []
+        self._started_at: Optional[datetime] = None
+        self._last_frame_at: Optional[datetime] = None
+        self._task = None
+
+    @property
+    def running(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+    @property
+    def frame_count(self) -> int:
+        return len(self._frames)
+
+    @property
+    def frames(self) -> list:
+        return list(self._frames)
+
+    def record_frame(self, d50: Optional[str]) -> None:
+        """Record one polled d50. Drops baseline matches, adjacent dups,
+        empty / None values. Updates the last-frame timestamp on accept."""
+        if not d50:
+            return
+        if d50 == self._baseline_d50:
+            return
+        if self._frames and self._frames[-1] == d50:
+            return
+        self._frames.append(d50)
+        self._last_frame_at = datetime.now()
+
+    def snapshot(self) -> dict:
+        """Return JSON-serialisable state for /api/captures/state."""
+        auto_stop = None
+        default_name = None
+        if self._started_at is not None:
+            hard_cap_at = self._started_at.timestamp() + self._hard_cap
+            if self._last_frame_at is not None:
+                idle_at = self._last_frame_at.timestamp() + self._idle_timeout
+                auto_stop_ts = min(hard_cap_at, idle_at)
+            else:
+                auto_stop_ts = hard_cap_at
+            auto_stop = datetime.fromtimestamp(auto_stop_ts).isoformat(timespec="seconds")
+            default_name = auto_capture_name(self._started_at, existing_names=set())
+        return {
+            "running": self.running,
+            "started_at": self._started_at.isoformat(timespec="seconds") if self._started_at else None,
+            "frame_count": self.frame_count,
+            "auto_stop_at": auto_stop,
+            "default_name": default_name,
+        }

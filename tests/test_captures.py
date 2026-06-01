@@ -118,3 +118,54 @@ def test_build_capture_preset_includes_captured_date_and_prompt():
 def test_build_capture_preset_empty_frames_raises():
     with pytest.raises(ValueError):
         captures.build_capture_preset([], name="anything")
+
+
+# --- CaptureSession state ---------------------------------------------------
+
+
+def test_capture_session_initial_snapshot_not_running():
+    sess = captures.CaptureSession(client=None, baseline_d50="N01:base;")
+    snap = sess.snapshot()
+    assert snap["running"] is False
+    assert snap["started_at"] is None
+    assert snap["frame_count"] == 0
+    assert snap["auto_stop_at"] is None
+    assert snap["default_name"] is None
+
+
+def test_capture_session_frame_count_reflects_record_frame():
+    sess = captures.CaptureSession(client=None, baseline_d50="X")
+    sess.record_frame("first")
+    sess.record_frame("second")
+    assert sess.frame_count == 2
+    assert sess.frames == ["first", "second"]
+
+
+def test_capture_session_record_frame_dedups_adjacent():
+    sess = captures.CaptureSession(client=None, baseline_d50="X")
+    sess.record_frame("A")
+    sess.record_frame("A")  # adjacent duplicate, dropped
+    sess.record_frame("B")
+    sess.record_frame("A")  # non-adjacent, kept
+    assert sess.frames == ["A", "B", "A"]
+
+
+def test_capture_session_record_frame_ignores_baseline():
+    # If the lamp echoes the baseline d50 (because nothing has changed yet),
+    # don't record it as a frame.
+    sess = captures.CaptureSession(client=None, baseline_d50="BASE")
+    sess.record_frame("BASE")
+    sess.record_frame("BASE")
+    assert sess.frames == []
+
+
+def test_capture_session_record_frame_ignores_none_and_empty():
+    sess = captures.CaptureSession(client=None, baseline_d50="X")
+    sess.record_frame(None)
+    sess.record_frame("")
+    assert sess.frames == []
+
+
+def test_capture_session_running_reflects_task_state():
+    sess = captures.CaptureSession(client=None, baseline_d50=None)
+    assert sess.running is False
