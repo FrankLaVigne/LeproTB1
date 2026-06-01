@@ -12,6 +12,8 @@ rationale for the timing constants.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 
 def dedup_consecutive(frames: list) -> list:
     """Drop consecutive duplicates from a frame list.
@@ -27,3 +29,24 @@ def dedup_consecutive(frames: list) -> list:
             continue
         out.append(frame)
     return out
+
+
+def auto_capture_name(now: datetime, existing_names: set[str]) -> str:
+    """Default preset name for a capture: ``capture-YYYY-MM-DD-HHMM-N``.
+
+    ``N`` is a 1-based tie-breaker that walks up until the candidate name
+    is not in ``existing_names``. We bucket on the minute (no seconds),
+    so back-to-back captures within the same minute collide and N
+    increments; captures a minute apart get distinct base names and start
+    at N=1 again.
+
+    ``now`` is taken as a parameter (not computed via ``datetime.now()``
+    inside) so tests can pin the clock.
+    """
+    base = now.strftime("capture-%Y-%m-%d-%H%M")
+    n = 1
+    while True:
+        candidate = f"{base}-{n}"
+        if candidate not in existing_names:
+            return candidate
+        n += 1

@@ -35,3 +35,40 @@ def test_dedup_consecutive_single_entry():
 def test_dedup_consecutive_all_same():
     # "A A A A" -> "A".
     assert captures.dedup_consecutive(["A", "A", "A", "A"]) == ["A"]
+
+
+# --- auto_capture_name ------------------------------------------------------
+
+
+def test_auto_capture_name_first_use():
+    now = datetime(2026, 5, 29, 14, 37, 22)  # seconds ignored
+    name = captures.auto_capture_name(now, set())
+    assert name == "capture-2026-05-29-1437-1"
+
+
+def test_auto_capture_name_pads_single_digit_month_day_and_minute():
+    now = datetime(2026, 1, 3, 7, 5, 0)
+    name = captures.auto_capture_name(now, set())
+    assert name == "capture-2026-01-03-0705-1"
+
+
+def test_auto_capture_name_increments_on_collision():
+    now = datetime(2026, 5, 29, 14, 37, 0)
+    existing = {"capture-2026-05-29-1437-1"}
+    name = captures.auto_capture_name(now, existing)
+    assert name == "capture-2026-05-29-1437-2"
+
+
+def test_auto_capture_name_walks_past_multiple_collisions():
+    now = datetime(2026, 5, 29, 14, 37, 0)
+    existing = {f"capture-2026-05-29-1437-{i}" for i in range(1, 6)}
+    name = captures.auto_capture_name(now, existing)
+    assert name == "capture-2026-05-29-1437-6"
+
+
+def test_auto_capture_name_ignores_unrelated_existing_names():
+    # Other names in the library shouldn't affect the counter.
+    now = datetime(2026, 5, 29, 14, 37, 0)
+    existing = {"snowfall", "tour-blue", "capture-2026-05-28-0900-3"}
+    name = captures.auto_capture_name(now, existing)
+    assert name == "capture-2026-05-29-1437-1"
