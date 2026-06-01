@@ -374,7 +374,155 @@ async def index_animations(_req):
 
 
 # Replaced by the real UI in Task 6.
-_PANEL_ANIMATIONS = "<p>animations panel loading...</p>"
+_PANEL_ANIMATIONS = """
+<div id="anim-list"></div>
+<div id="anim-empty" style="display:none">
+  No animations yet. Capture some via
+  <code>python -m cli.main capture --seconds 90</code>
+  and they'll appear here grouped by motion pattern.
+</div>
+<div id="anim-status"></div>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const list = $('#anim-list');
+const empty = $('#anim-empty');
+const status = $('#anim-status');
+
+function setStatus(msg, isError) {
+  status.textContent = msg || '';
+  status.style.color = isError ? 'var(--danger)' : '';
+}
+
+async function postJSON(path, body) {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body || {}),
+  });
+  return r.json();
+}
+
+function paletteSwatches(palette) {
+  return palette.map(c => `<span class="swatch" style="background:#${c}"></span>`).join('');
+}
+
+function buildRow(anim) {
+  const variantCount = anim.members.length;
+  const firstStats = (anim.members[0] || {}).frame_stats || {total: 0, unique: 0};
+  const stats = firstStats.total > 1
+    ? `${firstStats.total} frames (${firstStats.unique} unique)`
+    : `${firstStats.total} frame`;
+
+  // Build expanded recolor form.
+  const pickerInputs = anim.default_palette.map((c, i) =>
+    `<input type="color" value="#${c}" data-idx="${i}">`).join('');
+  const variantPills = anim.members.map(m =>
+    `<span class="v">${m.name}</span>`).join('');
+
+  const row = document.createElement('div');
+  row.className = 'anim-row';
+  row.dataset.id = anim.id;
+  row.innerHTML = `
+    <div class="anim-title" data-action="toggle">${anim.name}</div>
+    <div class="anim-actions">
+      <button data-action="play">▶ Play</button>
+      <button data-action="toggle">✎ Edit</button>
+    </div>
+    <div class="anim-meta">
+      <div class="anim-palette">${paletteSwatches(anim.default_palette)}</div>
+      <span>${stats}</span>
+      <span>·</span>
+      <span>${variantCount} variant${variantCount === 1 ? '' : 's'}</span>
+    </div>
+    <div class="anim-expanded">
+      <div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">RENAME</div>
+        <div class="anim-saverow">
+          <input type="text" data-role="rename" value="${anim.name}">
+          <button data-action="rename">Save name</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">RECOLOR PALETTE</div>
+        <div class="anim-pickers">${pickerInputs}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">SAVE AS NEW PRESET</div>
+        <div class="anim-saverow">
+          <input type="text" data-role="save-name" placeholder="my-variant">
+          <button data-action="save">💾 Save</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">VARIANTS</div>
+        <div class="anim-variants">${variantPills}</div>
+      </div>
+    </div>
+  `;
+  return row;
+}
+
+function attachHandlers(row, anim) {
+  // Toggle expansion.
+  for (const el of row.querySelectorAll('[data-action="toggle"]')) {
+    el.addEventListener('click', () => row.classList.toggle('expanded'));
+  }
+  // Play: previews the first member preset on the lamp via existing /api/preview.
+  row.querySelector('[data-action="play"]').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const sourceName = anim.members[0].name;
+    const j = await postJSON('/api/preview', {base_name: sourceName});
+    setStatus(j.ok === false ? ('error: ' + j.error) : `playing ${sourceName}…`, j.ok === false);
+  });
+  // Rename.
+  row.querySelector('[data-action="rename"]').addEventListener('click', async () => {
+    const name = row.querySelector('[data-role="rename"]').value.trim();
+    if (!name) { setStatus('name required', true); return; }
+    const j = await postJSON(`/api/animations/${anim.id}/rename`, {name});
+    if (j.ok === false) { setStatus('error: ' + j.error, true); return; }
+    setStatus(`renamed to ${name}`);
+    await loadAnimations();
+  });
+  // Save (recolor).
+  row.querySelector('[data-action="save"]').addEventListener('click', async () => {
+    const newName = row.querySelector('[data-role="save-name"]').value.trim();
+    if (!newName) { setStatus('save name required', true); return; }
+    const palette = Array.from(row.querySelectorAll('.anim-pickers input[type=color]'))
+      .sort((a, b) => parseInt(a.dataset.idx, 10) - parseInt(b.dataset.idx, 10))
+      .map(input => input.value.replace('#', '').toUpperCase());
+    const j = await postJSON(`/api/animations/${anim.id}/save`,
+                              {name: newName, palette});
+    if (j.ok === false) { setStatus('error: ' + j.error, true); return; }
+    setStatus(`saved → ${j.path}`);
+    await loadAnimations();
+  });
+}
+
+async function loadAnimations() {
+  try {
+    const r = await fetch('/api/animations');
+    const j = await r.json();
+    list.innerHTML = '';
+    const items = j.animations || [];
+    if (items.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    for (const anim of items) {
+      const row = buildRow(anim);
+      attachHandlers(row, anim);
+      list.appendChild(row);
+    }
+  } catch (e) {
+    setStatus('failed to load animations: ' + e.message, true);
+  }
+}
+
+loadAnimations();
+</script>
+"""
 
 # ---------------------------------------------------------------------------
 # Cockpit shell — shared layout for every page. See

@@ -300,3 +300,105 @@ button { font: inherit; cursor: pointer; }
   margin-top: var(--gap-sm);
   min-height: 1.2em;
 }
+
+/* === Animations tab ====================================================== */
+
+.anim-row {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: var(--gap);
+  margin-bottom: var(--gap-sm);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--gap-sm) var(--gap);
+  align-items: center;
+}
+.anim-row .anim-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.anim-row .anim-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.anim-row .anim-palette {
+  display: flex;
+  gap: 4px;
+}
+.anim-row .anim-palette .swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+.anim-row .anim-actions {
+  display: flex;
+  gap: var(--gap-xs);
+}
+.anim-row .anim-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: var(--panel-hi);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  font-size: 11px;
+}
+.anim-row .anim-actions button:hover { background: var(--accent-soft); color: var(--accent); }
+
+.anim-expanded {
+  grid-column: 1 / -1;
+  padding-top: var(--gap);
+  margin-top: var(--gap);
+  border-top: 1px solid var(--border);
+  display: none;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.anim-row.expanded .anim-expanded { display: flex; }
+
+.anim-pickers { display: flex; flex-wrap: wrap; gap: var(--gap-sm); }
+.anim-pickers input[type=color] {
+  width: 40px; height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.anim-saverow {
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+}
+.anim-saverow input[type=text] {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-hi);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  font: inherit;
+}
+
+.anim-variants {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.anim-variants .v {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  padding: 2px 8px;
+  background: var(--panel-hi);
+  border-radius: var(--r-pill);
+  font: 11px ui-monospace, monospace;
+}
+
+#anim-empty { color: var(--text-dim); text-align: center; padding: var(--gap-xl); font-style: italic; }
+#anim-status { font-size: 12px; color: var(--text-dim); margin-top: var(--gap); min-height: 1.2em; }
