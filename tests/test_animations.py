@@ -292,3 +292,85 @@ def test_apply_overrides_none_dict_treated_as_empty():
     groups = [_anim("aaaaaaaa", "x", [_member("a")])]
     out = animations.apply_overrides(groups, None)
     assert out == groups
+
+
+# --- HTTP layer --------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_api_animations_returns_grouped_list(tmp_path, monkeypatch):
+    """GET /api/animations returns a JSON list of grouped animations."""
+    from web import server as workshop
+
+    # Point the server at a tmp presets dir + tmp overrides file.
+    monkeypatch.setattr(workshop, "_PRESETS_DIR", tmp_path)
+    monkeypatch.setattr(workshop, "_ANIMATIONS_OVERRIDES_PATH", tmp_path / "animations.json")
+
+    # Write one preset.
+    p = {"name": "alpha", "payload": {"d50": "N01:P10001FF0000F21000100C4U3V3000640000E1;"}}
+    (tmp_path / "alpha.json").write_text(json.dumps(p))
+
+    resp = await workshop.api_animations(None)
+    body = json.loads(resp.body.decode() if isinstance(resp.body, bytes) else resp.body)
+    assert "animations" in body
+    assert len(body["animations"]) == 1
+    assert body["animations"][0]["name"] == "alpha"
+
+
+@pytest.mark.asyncio
+async def test_api_animation_rename_persists_to_overrides(tmp_path, monkeypatch):
+    """POST /api/animations/{id}/rename writes to animations.json."""
+    from web import server as workshop
+
+    monkeypatch.setattr(workshop, "_PRESETS_DIR", tmp_path)
+    overrides_path = tmp_path / "animations.json"
+    monkeypatch.setattr(workshop, "_ANIMATIONS_OVERRIDES_PATH", overrides_path)
+
+    class _FakeReq:
+        match_info = {"id": "deadbeef"}
+        async def json(self): return {"name": "MyCustomName"}
+
+    resp = await workshop.api_animation_rename(_FakeReq())
+    body = json.loads(resp.body.decode() if isinstance(resp.body, bytes) else resp.body)
+    assert body["ok"] is True
+    assert overrides_path.exists()
+    stored = json.loads(overrides_path.read_text())
+    assert stored["deadbeef"]["name"] == "MyCustomName"
+
+
+@pytest.mark.asyncio
+async def test_api_animation_save_creates_recolored_preset(tmp_path, monkeypatch):
+    """POST /api/animations/{id}/save writes a new preset file under presets/."""
+    from web import server as workshop
+
+    monkeypatch.setattr(workshop, "_PRESETS_DIR", tmp_path)
+    monkeypatch.setattr(workshop, "_ANIMATIONS_OVERRIDES_PATH", tmp_path / "animations.json")
+    monkeypatch.setattr(workshop, "_PROJECT_ROOT", tmp_path)  # path output uses relative_to
+
+    # Source preset: 2 colors -> red + green.
+    src_d50 = "N01:P10002FF000000FF00F210002005800066U3V3000640000E1;"
+    src = {"name": "src", "payload": {"d50": src_d50}}
+    (tmp_path / "src.json").write_text(json.dumps(src))
+
+    # Find the animation id by running group_presets directly.
+    groups = animations.group_presets(tmp_path)
+    assert len(groups) == 1
+    aid = groups[0].id
+
+    class _FakeReq:
+        match_info = {"id": aid}
+        async def json(self):
+            return {"name": "my-blue", "palette": ["0000FF", "FFFF00"]}
+
+    resp = await workshop.api_animation_save(_FakeReq())
+    body = json.loads(resp.body.decode() if isinstance(resp.body, bytes) else resp.body)
+    assert body["ok"] is True, body
+    out_path = tmp_path / "my-blue.json"
+    assert out_path.exists()
+    new = json.loads(out_path.read_text())
+    # The new preset's d50 should contain the new colors and NOT the old ones.
+    new_d50 = new["payload"]["d50"]
+    assert "0000FF" in new_d50
+    assert "FFFF00" in new_d50
+    assert "FF0000" not in new_d50
+    assert "00FF00" not in new_d50
