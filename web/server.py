@@ -323,6 +323,17 @@ async def _stop_preview() -> None:
     _preview_name = None
 
 
+async def _stop_capture() -> None:
+    """Cancel and clear any in-flight capture session. Safe to call when
+    no capture is active. Used by power-off so the capture doesn't keep
+    polling after the lamp is turned off."""
+    global _capture_session
+    sess = _capture_session
+    if sess is not None and sess.running:
+        await sess.stop()
+    _capture_session = None
+
+
 logging.basicConfig(level=logging.INFO)
 _LOG = logging.getLogger("workshop")
 
@@ -332,6 +343,9 @@ _PRESETS_DIR = _PROJECT_ROOT / "presets"
 
 # --- Animations tab — see docs/superpowers/specs/2026-06-01-animations-tab-design.md
 from web import animations as _animations_mod
+from web import captures as _captures_mod
+
+_capture_session = None  # type: ignore[assignment]
 
 _ANIMATIONS_OVERRIDES_PATH = _PROJECT_ROOT / "animations.json"
 
@@ -371,6 +385,102 @@ def _animation_to_json(anim) -> dict:
 async def index_animations(_req):
     return web.Response(text=_render_shell("animations", _PANEL_ANIMATIONS, "Animations"),
                         content_type="text/html")
+
+
+async def api_captures_start(_req):
+    """Start a new capture session. 409 if any other lamp-driver is running."""
+    global _capture_session
+    # Mutex with ticker / clock / preview / existing capture.
+    if _ticker_session is not None and _ticker_session.running:
+        return web.json_response(
+            {"ok": False, "error": "stock ticker is running; stop it first"},
+            status=409)
+    if _clock_session is not None and _clock_session.running:
+        return web.json_response(
+            {"ok": False, "error": "clock is running; stop it first"},
+            status=409)
+    if _preview_task is not None and not _preview_task.done():
+        return web.json_response(
+            {"ok": False, "error": "preset preview is running; stop it first"},
+            status=409)
+    if _capture_session is not None and _capture_session.running:
+        return web.json_response(
+            {"ok": False, "error": "a capture is already in progress"},
+            status=409)
+    # Baseline: whatever the lamp's d50 is right now. Anything that DIFFERS
+    # from this baseline becomes a recorded frame.
+    baseline = None
+    if _client is not None:
+        for fields in _client.state.values():
+            baseline = fields.get("d50")
+            break
+    sess = _captures_mod.CaptureSession(_client, baseline_d50=baseline)
+    await sess.start()
+    _capture_session = sess
+    return web.json_response({"ok": True, "started_at": sess.snapshot()["started_at"]})
+
+
+async def api_captures_state(_req):
+    """Return the active capture's snapshot, or a 'not running' shape."""
+    if _capture_session is None:
+        return web.json_response({
+            "running": False, "started_at": None, "frame_count": 0,
+            "auto_stop_at": None, "default_name": None,
+        })
+    return web.json_response(_capture_session.snapshot())
+
+
+async def api_captures_cancel(_req):
+    """Stop the capture without saving. Idempotent."""
+    await _stop_capture()
+    return web.json_response({"ok": True})
+
+
+async def api_captures_save(req):
+    """Stop the capture (if still running), build the preset, write it
+    to presets/, return path + matched_animation info (or null)."""
+    global _capture_session
+    try:
+        body = await req.json()
+        raw_name = body.get("name")
+        if raw_name is None:
+            return web.json_response({"ok": False, "error": "name required"}, status=400)
+        name = _sanitize_name(str(raw_name))
+        sess = _capture_session
+        if sess is None:
+            return web.json_response({"ok": False, "error": "no capture in progress"}, status=400)
+        # Stop the loop first so no more frames sneak in mid-save.
+        if sess.running:
+            await sess.stop()
+        frames = sess.frames
+        if not frames:
+            _capture_session = None
+            return web.json_response({"ok": False, "error": "no frames captured; nothing to save"}, status=400)
+        out_path = _PRESETS_DIR / f"{name}.json"
+        if out_path.exists():
+            return web.json_response(
+                {"ok": False, "error": f"preset {name!r} already exists; pick another name"},
+                status=400)
+        preset = _captures_mod.build_capture_preset(frames, name)
+        out_path.write_text(json.dumps(preset, indent=2) + "\n")
+        _capture_session = None
+        # Look up whether the new preset matches an existing animation group.
+        matched = None
+        for anim in _grouped_animations():
+            if any(m.name == name for m in anim.members) and len(anim.members) > 1:
+                matched = {
+                    "id": anim.id,
+                    "name": anim.name,
+                    "variant_count": len(anim.members),
+                }
+                break
+        return web.json_response({
+            "ok": True,
+            "path": str(out_path.relative_to(_PROJECT_ROOT)),
+            "matched_animation": matched,
+        })
+    except (KeyError, ValueError, TypeError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
 
 
 # Replaced by the real UI in Task 6.
@@ -1249,6 +1359,7 @@ async def api_power(req):
                 await _clock_session.stop()
                 _clock_session = None
             await _stop_preview()
+            await _stop_capture()
         await _client.power(on)
         return web.json_response({"ok": True, "on": on})
     except (LeproError, ValueError, KeyError) as e:
@@ -1261,6 +1372,7 @@ async def api_preview(req):
         body = await req.json()
         _check_ticker_mutex()
         _check_clock_mutex()
+        _check_capture_mutex()
         base_name = body["base_name"]
         color_map = body.get("color_map") or {}
         preset = _load_preset(base_name)
@@ -1347,6 +1459,7 @@ async def api_diy_paint(req):
         body = await req.json()
         _check_ticker_mutex()
         _check_clock_mutex()
+        _check_capture_mutex()
         await _stop_preview()
         leds = body["leds"]
         effect = body.get("effect", "Steady")
@@ -1445,6 +1558,11 @@ async def api_ticker_start(req):
                 {"ok": False, "error": "stock ticker already running"},
                 status=409,
             )
+        if _capture_session is not None and _capture_session.running:
+            return web.json_response(
+                {"ok": False, "error": "a capture is in progress; save or cancel it first"},
+                status=409,
+            )
         import asyncio
         # First-sample fetch for every symbol; if any return None, abort.
         results = await asyncio.gather(
@@ -1518,6 +1636,13 @@ async def api_cockpit_active(_req):
       "off", "clock", "ticker", "preset", "idle"
     and label is the formatted text shown in the banner.
     """
+    # 0. Capture in progress wins over everything — user is actively driving this.
+    if _capture_session is not None and _capture_session.running:
+        n = _capture_session.frame_count
+        return web.json_response({
+            "mode": "capturing",
+            "label": f"🎥 Capturing — {n} frame{'s' if n != 1 else ''}",
+        })
     # 1. Power off wins.
     if _client is not None:
         for fields in _client.state.values():
@@ -1563,6 +1688,19 @@ def _check_clock_mutex():
         )
 
 
+def _check_capture_mutex():
+    """Raise HTTPConflict if a capture is in progress.
+
+    Used by ticker/clock/preview/diy-paint starts to refuse the new operation
+    rather than silently destroying the user's in-flight capture work."""
+    global _capture_session
+    if _capture_session is not None and _capture_session.running:
+        raise web.HTTPConflict(
+            text='{"ok": false, "error": "a capture is in progress; save or cancel it first"}',
+            content_type="application/json",
+        )
+
+
 async def api_clock_start(req):
     global _clock_session
     try:
@@ -1576,6 +1714,10 @@ async def api_clock_start(req):
         if _ticker_session is not None and _ticker_session.running:
             return web.json_response(
                 {"ok": False, "error": "stock ticker is running; stop it first"},
+                status=409)
+        if _capture_session is not None and _capture_session.running:
+            return web.json_response(
+                {"ok": False, "error": "a capture is in progress; save or cancel it first"},
                 status=409)
         await _stop_preview()
         sess = _clock_mod.ClockSession(_client, colors=colors, mode=mode)
@@ -2178,6 +2320,10 @@ def build_app() -> web.Application:
         web.post(r"/api/animations/{id}/rename", api_animation_rename),
         web.post(r"/api/animations/{id}/merge_into/{other_id}", api_animation_merge),
         web.post(r"/api/animations/{id}/save", api_animation_save),
+        web.post("/api/captures/start", api_captures_start),
+        web.get("/api/captures/state", api_captures_state),
+        web.post("/api/captures/cancel", api_captures_cancel),
+        web.post("/api/captures/save", api_captures_save),
     ])
     # Static assets — currently just lamp-utils.js shared by /diy and /state.
     app.router.add_static("/static", _HERE / "static")
