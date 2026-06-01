@@ -12,7 +12,7 @@ rationale for the timing constants.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 
 def dedup_consecutive(frames: list) -> list:
@@ -50,3 +50,25 @@ def auto_capture_name(now: datetime, existing_names: set[str]) -> str:
         if candidate not in existing_names:
             return candidate
         n += 1
+
+
+def build_capture_preset(frames: list, name: str) -> dict:
+    """Assemble the preset JSON for a UI-captured animation.
+
+    Single-frame captures get a ``payload`` key matching the existing
+    DIY-save shape. Multi-frame captures get a ``frames`` list matching
+    the existing Lepro-AI-capture shape. Both shapes are consumed by
+    ``web/animations.py`` and the Presets tab without special-casing.
+    """
+    if not frames:
+        raise ValueError("cannot build preset from zero frames")
+
+    common = {
+        "name": name,
+        "description": f"Captured via the Animations tab UI on {date.today().isoformat()}.",
+        "captured": date.today().isoformat(),
+        "prompt": "captured via UI",
+    }
+    if len(frames) == 1:
+        return {**common, "payload": {"d1": 1, "d2": 2, "d50": frames[0]}}
+    return {**common, "frames": [{"d1": 1, "d2": 2, "d50": d} for d in frames]}

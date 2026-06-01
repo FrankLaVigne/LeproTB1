@@ -72,3 +72,49 @@ def test_auto_capture_name_ignores_unrelated_existing_names():
     existing = {"snowfall", "tour-blue", "capture-2026-05-28-0900-3"}
     name = captures.auto_capture_name(now, existing)
     assert name == "capture-2026-05-29-1437-1"
+
+
+# --- build_capture_preset ---------------------------------------------------
+
+
+def test_build_capture_preset_single_frame_uses_payload_shape():
+    frames = ["N01:P10001FFFFFFF21000100C4U3V3000640000E1;"]
+    preset = captures.build_capture_preset(frames, name="my-capture")
+    assert preset["name"] == "my-capture"
+    assert "payload" in preset
+    assert preset["payload"]["d50"] == frames[0]
+    assert preset["payload"]["d1"] == 1
+    assert preset["payload"]["d2"] == 2
+    assert "frames" not in preset
+
+
+def test_build_capture_preset_multi_frame_uses_frames_shape():
+    frames = [
+        "N01:P10001FFFFFFF21000100C4U3V3000640000E1;",
+        "N01:P10001FF0000F21000100C4U3V3000640000E1;",
+        "N01:P10001" + "00FF00" + "F21000100C4U3V3000640000E1;",
+    ]
+    preset = captures.build_capture_preset(frames, name="my-capture")
+    assert preset["name"] == "my-capture"
+    assert "frames" in preset
+    assert len(preset["frames"]) == 3
+    for i, f in enumerate(preset["frames"]):
+        assert f["d50"] == frames[i]
+        assert f["d1"] == 1
+        assert f["d2"] == 2
+    assert "payload" not in preset
+
+
+def test_build_capture_preset_includes_captured_date_and_prompt():
+    frames = ["N01:P10001FFFFFFF21000100C4U3V3000640000E1;"]
+    preset = captures.build_capture_preset(frames, name="my-capture")
+    assert "captured" in preset
+    # ISO YYYY-MM-DD shape
+    assert len(preset["captured"]) == 10 and preset["captured"][4] == "-"
+    assert preset["prompt"] == "captured via UI"
+    assert preset["description"].startswith("Captured")
+
+
+def test_build_capture_preset_empty_frames_raises():
+    with pytest.raises(ValueError):
+        captures.build_capture_preset([], name="anything")
