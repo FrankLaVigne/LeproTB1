@@ -155,7 +155,7 @@ Open `http://<vm-ip>:8081`. The interface is a single "cockpit" layout:
     the result as a new preset. Useful when you've captured the same
     Lepro-AI prompt twice with different palettes and want to see they're
     the same motion underneath. Manual rename and merge available via
-    `animations.json` (gitignored, written by the tab's UI).
+    `animations.json` (tracked in git, written by the tab's UI).
 
 While the ticker or clock is running, the DIY paint and the Presets-page
 preview endpoint return HTTP 409. Power off stops every active driver
