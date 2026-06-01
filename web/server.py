@@ -578,6 +578,7 @@ _SHELL_TEMPLATE = """<!doctype html>
       <a href="/diy" {cls_diy}>&#x270F;&#xFE0F; DIY</a>
       <a href="/ticker" {cls_ticker}>&#x1F4C8; Ticker</a>
       <a href="/clock" {cls_clock}>&#x23F0; Clock</a>
+      <a href="/animations" {cls_animations}>&#x1F39E;&#xFE0F; Animations</a>
     </nav>
     <section class="panel">
 {panel}
@@ -602,6 +603,7 @@ def _render_shell(active: str, panel_html: str, title: str) -> str:
         "diy": "",
         "ticker": "",
         "clock": "",
+        "animations": "",
     }
     if active not in active_classes:
         raise ValueError(f"unknown tab {active!r}; expected one of {list(active_classes)}")
@@ -613,6 +615,7 @@ def _render_shell(active: str, panel_html: str, title: str) -> str:
         cls_diy=active_classes["diy"],
         cls_ticker=active_classes["ticker"],
         cls_clock=active_classes["clock"],
+        cls_animations=active_classes["animations"],
     )
 
 

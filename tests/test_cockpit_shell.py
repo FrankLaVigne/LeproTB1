@@ -128,3 +128,15 @@ async def test_stop_preview_cancels_running_task():
     await workshop._stop_preview()
     assert workshop._preview_task is None
     assert workshop._preview_name is None
+
+
+def test_render_shell_links_to_animations_tab():
+    out = workshop._render_shell(active="animations", panel_html="", title="Animations")
+    assert 'href="/animations"' in out
+    assert 'href="/animations" class="active"' in out
+
+
+def test_render_shell_animations_tab_present_on_other_pages():
+    # Even when not active, the Animations link must appear on every page.
+    out = workshop._render_shell(active="presets", panel_html="", title="Presets")
+    assert 'href="/animations"' in out
