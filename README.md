@@ -155,7 +155,12 @@ Open `http://<vm-ip>:8081`. The interface is a single "cockpit" layout:
     the result as a new preset. Useful when you've captured the same
     Lepro-AI prompt twice with different palettes and want to see they're
     the same motion underneath. Manual rename and merge available via
-    `animations.json` (tracked in git, written by the tab's UI).
+    `animations.json` (tracked in git, written by the tab's UI). A **🎥
+    Capture** button at the top lets you grow the library from the UI:
+    click it, trigger one animation in the Lepro phone app, the server
+    records the d50 frames over MQTT (auto-stops on 6 s idle or 90 s cap)
+    and saves the result as a new preset. A counter shows your progress
+    toward the Lepro app's ~72-animation catalog.
 
 While the ticker or clock is running, the DIY paint and the Presets-page
 preview endpoint return HTTP 409. Power off stops every active driver
