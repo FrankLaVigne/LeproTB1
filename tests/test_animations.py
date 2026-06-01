@@ -131,3 +131,88 @@ def test_per_preset_frame_stats_distinct_structures():
 def test_per_preset_frame_stats_empty_returns_zero_zero():
     assert animations.per_preset_frame_stats({}) == {"total": 0, "unique": 0}
     assert animations.per_preset_frame_stats({"frames": []}) == {"total": 0, "unique": 0}
+
+
+# --- Animation + group_presets ----------------------------------------------
+
+
+def test_group_presets_groups_same_signature(tmp_path):
+    # Two presets with identical structure but different palette colors
+    # should end up in one Animation group.
+    a = _single_frame_preset("N01:P10001FF0000F21000100C4U3V3000640000E1;")
+    a["name"] = "red"
+    b = _single_frame_preset("N01:P10001"+"00FF00"+"F21000100C4U3V3000640000E1;")
+    b["name"] = "green"
+    (tmp_path / "red.json").write_text(json.dumps(a))
+    (tmp_path / "green.json").write_text(json.dumps(b))
+
+    groups = animations.group_presets(tmp_path)
+    assert len(groups) == 1
+    g = groups[0]
+    assert len(g.members) == 2
+    names = sorted(m.name for m in g.members)
+    assert names == ["green", "red"]
+
+
+def test_group_presets_separates_different_signatures(tmp_path):
+    # Differentiate at the palette count digit so the difference falls
+    # within the 40-char fingerprint cutoff.
+    a = _single_frame_preset("N01:P10001FFFFFFF21000100C4U3V3000640000E1;")  # N=1
+    a["name"] = "calm"
+    b = _single_frame_preset("N01:P10003FFFFFFFFFFFFFFFFFFF210003005800066006CU3V3000640000E1;")  # N=3
+    b["name"] = "pulse"
+    (tmp_path / "calm.json").write_text(json.dumps(a))
+    (tmp_path / "pulse.json").write_text(json.dumps(b))
+
+    groups = animations.group_presets(tmp_path)
+    assert len(groups) == 2
+
+
+def test_group_presets_default_palette_from_first_member(tmp_path):
+    p = _single_frame_preset("N01:P10002FF000000FF00F210002005800C0U3V3000640000E1;")
+    p["name"] = "calm"
+    (tmp_path / "calm.json").write_text(json.dumps(p))
+    groups = animations.group_presets(tmp_path)
+    assert len(groups) == 1
+    # Two-color palette: FF0000 and 00FF00.
+    assert groups[0].default_palette == ["FF0000", "00FF00"]
+
+
+def test_group_presets_id_is_stable_hex(tmp_path):
+    p = _single_frame_preset("N01:P10001FF0000F21000100C4U3V3000640000E1;")
+    p["name"] = "x"
+    (tmp_path / "x.json").write_text(json.dumps(p))
+    groups = animations.group_presets(tmp_path)
+    # ID is a short hex string (8 chars).
+    assert len(groups[0].id) == 8
+    assert all(c in "0123456789abcdef" for c in groups[0].id)
+
+
+def test_group_presets_default_name_is_first_member(tmp_path):
+    a = _single_frame_preset("N01:P10001FF0000F21000100C4U3V3000640000E1;")
+    a["name"] = "alpha"
+    b = _single_frame_preset("N01:P10001FF0000F21000100C4U3V3000640000E1;")
+    b["name"] = "bravo"
+    (tmp_path / "alpha.json").write_text(json.dumps(a))
+    (tmp_path / "bravo.json").write_text(json.dumps(b))
+    groups = animations.group_presets(tmp_path)
+    # First-by-name member's name becomes the default group name.
+    assert groups[0].name == "alpha"
+
+
+def test_group_presets_empty_dir_returns_empty_list(tmp_path):
+    assert animations.group_presets(tmp_path) == []
+
+
+def test_group_presets_member_includes_frame_stats(tmp_path):
+    # 3 frames; 2 share fingerprint (same N=1), 1 differs (N=3) — so unique=2.
+    p = _multi_frame_preset([
+        "N01:P10001FF0000F21000100C4U3V3000640000E1;",
+        "N01:P10001FF0000F21000100C4U3V3000640000E1;",
+        "N01:P10003FFFFFFFFFFFFFFFFFFF210003005800066006CU3V3000640000E1;",
+    ])
+    p["name"] = "x"
+    (tmp_path / "x.json").write_text(json.dumps(p))
+    groups = animations.group_presets(tmp_path)
+    m = groups[0].members[0]
+    assert m.frame_stats == {"total": 3, "unique": 2}

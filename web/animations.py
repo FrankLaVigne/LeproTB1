@@ -64,3 +64,84 @@ def per_preset_frame_stats(preset: dict) -> dict:
         return {"total": 0, "unique": 0}
     fps = [frame_fingerprint(f.get("d50", "")) for f in frames]
     return {"total": len(fps), "unique": len(set(fps))}
+
+
+import hashlib
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+@dataclass
+class PresetMember:
+    """One captured preset that maps to an Animation group."""
+
+    name: str                   # filename stem
+    palette: list               # 6-hex colors from the first frame
+    frame_stats: dict           # {"total": N, "unique": K}
+
+
+@dataclass
+class Animation:
+    """A deduped motion group: one or more presets sharing the same signature."""
+
+    id: str                          # 8-char hex hash of the signature
+    name: str                        # display name (auto from first member, override-able)
+    members: list                    # list[PresetMember]
+    default_palette: list = field(default_factory=list)
+
+
+def _extract_first_palette(preset: dict) -> list:
+    """Return the palette from the first frame as a list of 6-hex strings."""
+    frames = _preset_frames(preset)
+    if not frames:
+        return []
+    d50 = frames[0].get("d50", "")
+    m = _PALETTE_RE.search(d50)
+    if not m:
+        return []
+    n = int(m.group(1))
+    colors = m.group(2)[:n * 6]
+    return [colors[i * 6:i * 6 + 6].upper() for i in range(n)]
+
+
+def group_presets(presets_dir: Path) -> list:
+    """Scan presets_dir for *.json files, group by motion signature.
+
+    Returns a list of ``Animation`` records sorted by id for stable output.
+    Members within each group are sorted by name (alphabetical) and the
+    first-by-name member's name becomes the group's default name.
+    """
+    presets_dir = Path(presets_dir)
+    by_sig: dict = {}
+    for path in sorted(presets_dir.glob("*.json")):
+        try:
+            preset = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        sig = preset_signature(preset)
+        if not sig:
+            continue
+        by_sig.setdefault(sig, []).append((path.stem, preset))
+
+    out = []
+    for sig, items in sorted(by_sig.items()):
+        items.sort(key=lambda p: p[0])  # alphabetical by stem
+        sig_id = hashlib.sha1(sig.encode()).hexdigest()[:8]
+        first_name, first_preset = items[0]
+        members = [
+            PresetMember(
+                name=name,
+                palette=_extract_first_palette(preset),
+                frame_stats=per_preset_frame_stats(preset),
+            )
+            for name, preset in items
+        ]
+        out.append(Animation(
+            id=sig_id,
+            name=first_name,
+            members=members,
+            default_palette=_extract_first_palette(first_preset),
+        ))
+    out.sort(key=lambda a: a.id)
+    return out
