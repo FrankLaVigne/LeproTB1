@@ -60,3 +60,74 @@ def test_frame_fingerprint_palette_count_preserved():
     assert out_3[9] == "3"
     assert out_1[9] == "1"
     assert out_3 != out_1
+
+
+# --- preset_signature --------------------------------------------------------
+
+
+def _single_frame_preset(d50: str) -> dict:
+    return {"name": "fake", "payload": {"d50": d50}}
+
+
+def _multi_frame_preset(d50s: list) -> dict:
+    return {"name": "fake", "frames": [{"d50": s} for s in d50s]}
+
+
+def test_preset_signature_single_frame():
+    preset = _single_frame_preset("N01:P10001FFFFFFF21000100C4U3V3000640000E1;")
+    sig = animations.preset_signature(preset)
+    # No pipes for single-frame presets.
+    assert "|" not in sig
+    assert sig == animations.frame_fingerprint(preset["payload"]["d50"])
+
+
+def test_preset_signature_multi_frame_joined_with_pipe():
+    preset = _multi_frame_preset([
+        "N01:P10001FFFFFFF21000100C4U3V3000640000E1;",
+        "N01:P10001FF0000F21000100C4U3V3000640000E1;",
+    ])
+    sig = animations.preset_signature(preset)
+    assert sig.count("|") == 1
+    # The two fingerprints, joined by |.
+    fp_a = animations.frame_fingerprint(preset["frames"][0]["d50"])
+    fp_b = animations.frame_fingerprint(preset["frames"][1]["d50"])
+    assert sig == f"{fp_a}|{fp_b}"
+
+
+def test_preset_signature_empty_preset_returns_empty():
+    assert animations.preset_signature({}) == ""
+    assert animations.preset_signature({"frames": []}) == ""
+
+
+# --- per_preset_frame_stats --------------------------------------------------
+
+
+def test_per_preset_frame_stats_single_frame_is_one_one():
+    preset = _single_frame_preset("N01:P10001FFFFFFF21000100C4U3V3000640000E1;")
+    assert animations.per_preset_frame_stats(preset) == {"total": 1, "unique": 1}
+
+
+def test_per_preset_frame_stats_counts_unique_frame_fingerprints():
+    # 5 frames; all 5 share the same palette-stripped fingerprint
+    # (different colors don't change the fingerprint).
+    f_red   = "N01:P10001FF0000F21000100C4U3V3000640000E1;"
+    f_green = "N01:P10001" + "00FF00" + "F21000100C4U3V3000640000E1;"
+    f_blue  = "N01:P10001" + "0000FF" + "F21000100C4U3V3000640000E1;"
+    preset = _multi_frame_preset([f_red, f_green, f_blue, f_red, f_red])
+    stats = animations.per_preset_frame_stats(preset)
+    assert stats == {"total": 5, "unique": 1}
+
+
+def test_per_preset_frame_stats_distinct_structures():
+    # Two different palette sizes -> two different fingerprints (the palette
+    # count digit lands inside the 40-char fingerprint window).
+    f_one_color   = "N01:P10001FFFFFFF21000100C4U3V3000640000E1;"
+    f_three_color = "N01:P10003FFFFFFFFFFFFFFFFFFF21000100C4U3;"
+    preset = _multi_frame_preset([f_one_color, f_one_color, f_three_color])
+    stats = animations.per_preset_frame_stats(preset)
+    assert stats == {"total": 3, "unique": 2}
+
+
+def test_per_preset_frame_stats_empty_returns_zero_zero():
+    assert animations.per_preset_frame_stats({}) == {"total": 0, "unique": 0}
+    assert animations.per_preset_frame_stats({"frames": []}) == {"total": 0, "unique": 0}

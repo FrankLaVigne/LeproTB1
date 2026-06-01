@@ -39,3 +39,28 @@ def frame_fingerprint(d50: str) -> str:
 
     stripped = _PALETTE_RE.sub(replace, d50, count=1)
     return stripped[:_FINGERPRINT_LEN]
+
+
+def _preset_frames(preset: dict) -> list:
+    """Return the list of frame dicts inside a preset, regardless of shape."""
+    if "frames" in preset:
+        return preset.get("frames") or []
+    payload = preset.get("payload")
+    return [payload] if payload else []
+
+
+def preset_signature(preset: dict) -> str:
+    """Pipe-joined per-frame fingerprints. Single-frame presets have no pipes."""
+    frames = _preset_frames(preset)
+    if not frames:
+        return ""
+    return "|".join(frame_fingerprint(f.get("d50", "")) for f in frames)
+
+
+def per_preset_frame_stats(preset: dict) -> dict:
+    """Count total frames and distinct frame fingerprints within one preset."""
+    frames = _preset_frames(preset)
+    if not frames:
+        return {"total": 0, "unique": 0}
+    fps = [frame_fingerprint(f.get("d50", "")) for f in frames]
+    return {"total": len(fps), "unique": len(set(fps))}
