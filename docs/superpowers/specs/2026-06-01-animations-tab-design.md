@@ -20,15 +20,24 @@ variation only). My naïve "strip palette, hash everything else" fingerprint
 shows all 6 as unique because the AI introduces frame-level variation even
 when the underlying motion is the same.
 
-**User mental model: the user sees each preset as ONE discrete animation
-in the Lepro app**, even though our capture reveals it's a multi-frame
-sequence with internal variation. The Lepro AI does extra work behind the
-scenes; we don't need to expose that as a primary axis. The Animations tab's
-job is "tell me which of my captured animations are the same as each other
-underneath the colors" — the cross-preset grouping. We surface per-preset
-frame-stats as a small subtitle on each row (informational, not the
-headline), and we lean on the manual-merge action as the escape hatch when
-the algorithmic grouping inevitably misfires.
+**Working hypothesis (NOT verified): the user sees each preset as ONE
+discrete animation in the Lepro app**, even though our capture reveals it's
+a multi-frame sequence with internal variation. We have NOT side-by-side
+inspected the Lepro app to confirm this — it's our best-guess interpretation
+of what the AI's per-frame variation means. The Lepro AI does extra work
+behind the scenes that we observe but don't yet understand.
+
+This conjecture shapes the v1 design: the Animations tab's job is "tell me
+which of my captured animations are the same as each other underneath the
+colors" — cross-preset grouping. We surface per-preset frame-stats as a
+small subtitle on each row (informational, not the headline), and we lean
+on the manual-merge action as the escape hatch when the algorithmic
+grouping inevitably misfires.
+
+If we later discover the multi-frame structure encodes something the user
+DOES want to control (e.g., the AI's per-frame palette cycling within one
+named preset, or sub-sequence transitions that vary the look), we revisit
+the design — possibly elevating per-frame analysis to a primary view.
 
 ## Approach
 
