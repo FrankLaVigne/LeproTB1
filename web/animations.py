@@ -12,6 +12,7 @@ framing is conjecture, not verified fact.
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 _FINGERPRINT_LEN = 40
 # Match P1000<N><N*6 hex> exactly — N is a single digit.
@@ -144,4 +145,44 @@ def group_presets(presets_dir: Path) -> list:
             default_palette=_extract_first_palette(first_preset),
         ))
     out.sort(key=lambda a: a.id)
+    return out
+
+
+def apply_overrides(groups: list, overrides: Optional[dict]) -> list:
+    """Apply rename + alias_of overrides to a list of Animation groups.
+
+    Overrides shape::
+        {"<animation_id>": {"name": "Tour", "alias_of": "<other_id>"}}
+
+    Either field is optional. If ``alias_of`` is set AND points at a real
+    other group in the list, the aliased group's members are folded into
+    the target's members and the alias is dropped from output. The target's
+    own ``name`` override (if any) wins; the alias's name is discarded.
+    """
+    if not overrides:
+        return list(groups)
+
+    by_id = {g.id: g for g in groups}
+    drop_ids = set()
+    for src_id, ov in overrides.items():
+        target_id = (ov or {}).get("alias_of")
+        if not target_id or target_id not in by_id or src_id not in by_id:
+            continue
+        if src_id == target_id:
+            continue
+        target = by_id[target_id]
+        source = by_id[src_id]
+        target.members = list(target.members) + list(source.members)
+        # Re-sort target members for stable output.
+        target.members.sort(key=lambda m: m.name)
+        drop_ids.add(src_id)
+
+    out = []
+    for g in groups:
+        if g.id in drop_ids:
+            continue
+        name_override = (overrides.get(g.id) or {}).get("name")
+        if name_override:
+            g.name = name_override
+        out.append(g)
     return out

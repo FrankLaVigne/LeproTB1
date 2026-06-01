@@ -216,3 +216,79 @@ def test_group_presets_member_includes_frame_stats(tmp_path):
     groups = animations.group_presets(tmp_path)
     m = groups[0].members[0]
     assert m.frame_stats == {"total": 3, "unique": 2}
+
+
+# --- apply_overrides --------------------------------------------------------
+
+
+def _anim(id_: str, name: str, members: list) -> animations.Animation:
+    return animations.Animation(id=id_, name=name, members=members)
+
+
+def _member(name: str) -> animations.PresetMember:
+    return animations.PresetMember(name=name, palette=[], frame_stats={"total": 1, "unique": 1})
+
+
+def test_apply_overrides_renames_group():
+    groups = [_anim("aaaaaaaa", "old", [_member("x")])]
+    out = animations.apply_overrides(groups, {"aaaaaaaa": {"name": "new"}})
+    assert len(out) == 1
+    assert out[0].name == "new"
+
+
+def test_apply_overrides_merges_alias_into_target():
+    groups = [
+        _anim("aaaaaaaa", "main", [_member("a")]),
+        _anim("bbbbbbbb", "alias", [_member("b")]),
+    ]
+    out = animations.apply_overrides(groups, {"bbbbbbbb": {"alias_of": "aaaaaaaa"}})
+    assert len(out) == 1
+    merged = out[0]
+    assert merged.id == "aaaaaaaa"
+    member_names = sorted(m.name for m in merged.members)
+    assert member_names == ["a", "b"]
+
+
+def test_apply_overrides_merge_keeps_target_name():
+    groups = [
+        _anim("aaaaaaaa", "kept", [_member("a")]),
+        _anim("bbbbbbbb", "discarded", [_member("b")]),
+    ]
+    out = animations.apply_overrides(groups, {"bbbbbbbb": {"alias_of": "aaaaaaaa"}})
+    assert out[0].name == "kept"
+
+
+def test_apply_overrides_merge_target_can_be_renamed():
+    # An alias merge + a rename on the target can coexist.
+    groups = [
+        _anim("aaaaaaaa", "auto", [_member("a")]),
+        _anim("bbbbbbbb", "auto", [_member("b")]),
+    ]
+    overrides = {
+        "aaaaaaaa": {"name": "Renamed Target"},
+        "bbbbbbbb": {"alias_of": "aaaaaaaa"},
+    }
+    out = animations.apply_overrides(groups, overrides)
+    assert len(out) == 1
+    assert out[0].name == "Renamed Target"
+
+
+def test_apply_overrides_alias_to_unknown_target_keeps_orphan():
+    # If alias_of points at a non-existent id, leave the group as-is
+    # rather than dropping it.
+    groups = [_anim("aaaaaaaa", "lonely", [_member("a")])]
+    out = animations.apply_overrides(groups, {"aaaaaaaa": {"alias_of": "zzzzzzzz"}})
+    assert len(out) == 1
+    assert out[0].id == "aaaaaaaa"
+
+
+def test_apply_overrides_no_overrides_returns_groups_unchanged():
+    groups = [_anim("aaaaaaaa", "x", [_member("a")])]
+    out = animations.apply_overrides(groups, {})
+    assert out == groups
+
+
+def test_apply_overrides_none_dict_treated_as_empty():
+    groups = [_anim("aaaaaaaa", "x", [_member("a")])]
+    out = animations.apply_overrides(groups, None)
+    assert out == groups
