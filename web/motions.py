@@ -64,7 +64,7 @@ def extract_palette(d50) -> list[str]:
 
 def has_p4_block(d50) -> bool:
     """True if the d50 contains the unconfirmed P4 palette variant."""
-    return bool(_P4_RE.search(d50 or ""))
+    return isinstance(d50, str) and bool(_P4_RE.search(d50))
 
 
 def is_recolorable(d50) -> bool:
@@ -116,5 +116,7 @@ def motion_signature(d50) -> tuple[str, str]:
     loose:  strict + palette counts and R3 flag digits masked. Two captures of the
             same motion with ANY palette share a loose signature.
     """
+    if not isinstance(d50, str):
+        d50 = ""
     return (_sha1(_masked(d50, mask_counts=False)),
             _sha1(_masked(d50, mask_counts=True)))

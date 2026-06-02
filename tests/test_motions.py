@@ -149,3 +149,24 @@ def test_signatures_are_stable_hashes():
     s2, l2 = motions.motion_signature(N01_SOLID)
     assert (s1, l1) == (s2, l2)
     assert len(s1) == 40 and len(l1) == 40    # sha1 hex
+
+
+def test_signature_handles_none_and_non_string():
+    """All public functions tolerate garbage input — signatures of degenerate
+    input are stable (not crashes)."""
+    assert motions.motion_signature(None) == motions.motion_signature("")
+    assert motions.motion_signature(42) == motions.motion_signature("")
+    assert motions.has_p4_block(None) is False
+    assert motions.has_p4_block(42) is False
+
+
+def test_signature_p4_only_frame_strict_equals_loose():
+    """A P4-only frame has no P1000 blocks to mask, so strict == loose
+    (modulo R3 masking, absent here)."""
+    s, l = motions.motion_signature(P4_CYBERPUNK)
+    assert s == l
+
+
+def test_blocks_invalid_hex_after_count_is_skipped():
+    """A P1000 match whose following chars aren't valid hex colors is not a block."""
+    assert motions.find_palette_blocks("N01:P10002FF00;U3V3") == []
