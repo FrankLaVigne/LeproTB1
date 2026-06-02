@@ -18,6 +18,7 @@ from pathlib import Path
 from aiohttp import web
 
 from lepro import LeproClient, LeproError, load_config
+from web import lampview
 
 # Match P1000<count><colors>. Count is a single decimal digit (1-9 verified;
 # docs/REVERSE_ENGINEERING.md caps at 9). Colors are distinct 6-hex RGB tuples.
@@ -1760,32 +1761,32 @@ async def api_lamp_state(_req):
     })
 
 
-async def api_cockpit_active(_req):
-    """Return the active-mode banner data for the cockpit left panel.
+def _active_mode() -> dict:
+    """Compute the active-mode banner: ``{"mode": ..., "label": ...}``.
 
-    Returns ``{mode, label}`` where mode is one of:
-      "off", "clock", "ticker", "preset", "idle"
-    and label is the formatted text shown in the banner.
+    mode is one of "capturing", "off", "clock", "ticker", "preset", "idle".
+    Shared by api_cockpit_active (web cockpit) and api_lamp_leds (TUI) so the
+    two front-ends always agree.
     """
     # 0. Capture in progress wins over everything — user is actively driving this.
     if _capture_session is not None and _capture_session.running:
         n = _capture_session.frame_count
-        return web.json_response({
+        return {
             "mode": "capturing",
             "label": f"🎥 Capturing — {n} frame{'s' if n != 1 else ''}",
-        })
+        }
     # 1. Power off wins.
     if _client is not None:
         for fields in _client.state.values():
             if fields.get("d1") == 0:
-                return web.json_response({"mode": "off", "label": "⏻ Off"})
+                return {"mode": "off", "label": "⏻ Off"}
     # 2. Active background sessions.
     if _clock_session is not None and _clock_session.running:
         snap = _clock_session.snapshot()
         now = (snap.get("now_displayed") or "")
         suffix = now.split("T", 1)[1] if "T" in now else now
         label = f"⏰ Clock — {suffix}" if suffix else "⏰ Clock"
-        return web.json_response({"mode": "clock", "label": label})
+        return {"mode": "clock", "label": label}
     if _ticker_session is not None and _ticker_session.running:
         snap = _ticker_session.snapshot()
         syms = []
@@ -1794,12 +1795,43 @@ async def api_cockpit_active(_req):
             if r and r.get("symbol"):
                 syms.append(r["symbol"])
         label = "\U0001F4C8 Ticker — " + ", ".join(syms) if syms else "\U0001F4C8 Ticker"
-        return web.json_response({"mode": "ticker", "label": label})
+        return {"mode": "ticker", "label": label}
     if _preview_task is not None and not _preview_task.done():
         nm = _preview_name or "?"
-        return web.json_response({"mode": "preset", "label": f"\U0001F3A8 Preset — {nm}"})
+        return {"mode": "preset", "label": f"\U0001F3A8 Preset — {nm}"}
     # 3. On but nothing actively driving.
-    return web.json_response({"mode": "idle", "label": "✨ Idle"})
+    return {"mode": "idle", "label": "✨ Idle"}
+
+
+async def api_cockpit_active(_req):
+    """Return the active-mode banner data for the cockpit left panel."""
+    return web.json_response(_active_mode())
+
+
+async def api_lamp_leds(_req):
+    """Everything the TUI needs in one round-trip.
+
+    Returns power state, brightness, lamp mode, the active-mode banner, the
+    raw d-fields (for the TUI's diagnostics panel), and a 196-entry page-space
+    LED color array — or null when the current d50 isn't decodable (e.g.
+    official-app N02/N03 animations).
+    """
+    from datetime import datetime, timezone
+    fields = {}
+    if _client is not None:
+        for f in _client.state.values():
+            fields = f
+            break    # the workshop only ever has one lamp
+    d52 = fields.get("d52")
+    return web.json_response({
+        "power": fields.get("d1") == 1,
+        "brightness_pct": round(d52 / 10) if isinstance(d52, (int, float)) else None,
+        "lamp_mode": {0: "white", 1: "rgb", 2: "segmented", 3: "effect"}.get(fields.get("d2")),
+        "active": _active_mode(),
+        "leds": lampview.fields_to_leds(fields),
+        "fields": dict(fields),
+        "polled_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    })
 
 
 # --- Clock endpoints ---------------------------------------------------------
@@ -2441,6 +2473,7 @@ def build_app() -> web.Application:
         web.post("/api/ticker/stop", api_ticker_stop),
         web.get("/api/ticker/state", api_ticker_state),
         web.get("/api/lamp/state", api_lamp_state),
+        web.get("/api/lamp/leds", api_lamp_leds),
         web.get("/api/cockpit/active", api_cockpit_active),
         web.get("/clock", index_clock),
         web.post("/api/clock/start", api_clock_start),
