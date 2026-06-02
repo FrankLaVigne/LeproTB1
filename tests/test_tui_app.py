@@ -228,3 +228,24 @@ async def test_poll_does_not_clobber_sent_brightness_until_echoed():
         api.state = make_state(brightness_pct=30)
         await app.refresh_state()
         assert app.query_one(StatusBar).state["brightness_pct"] == 30
+
+
+@pytest.mark.asyncio
+async def test_rejected_brightness_post_releases_guard():
+    """A 409/400-rejected brightness POST must not freeze the displayed value."""
+
+    class RejectingApi(StubApi):
+        async def set_brightness(self, pct):
+            self.calls.append(("set_brightness", pct))
+            return {"ok": False, "error": "stock ticker is running"}
+
+    api = RejectingApi()  # brightness_pct = 80
+    app = LeproTUI(api=api)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("up")                              # optimistic 85
+        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.3)     # POST fires, rejected
+        assert ("set_brightness", 85) in api.calls
+        # Server still reports the real value (80); the display must accept it.
+        await app.refresh_state()
+        assert app.query_one(StatusBar).state["brightness_pct"] == 80

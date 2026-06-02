@@ -295,8 +295,12 @@ class LeproTUI(App):
         self._brightness_timer = None
         if pct is None:
             return
-        self._sent_brightness = pct
+        self._sent_brightness = pct          # guard the in-flight window
         result = await self.api.set_brightness(pct)
+        if isinstance(result, dict) and result.get("ok") is False:
+            # Rejected (mutex conflict / validation): the lamp will never echo
+            # this value, so release the guard instead of freezing the display.
+            self._sent_brightness = None
         self._notify_if_error(result)
         self.burst_refresh()
 
