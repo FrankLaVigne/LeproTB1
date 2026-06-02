@@ -170,3 +170,80 @@ def test_signature_p4_only_frame_strict_equals_loose():
 def test_blocks_invalid_hex_after_count_is_skipped():
     """A P1000 match whose following chars aren't valid hex colors is not a block."""
     assert motions.find_palette_blocks("N01:P10002FF00;U3V3") == []
+
+
+# --- remap_colors (ground truth) ---------------------------------------------------
+
+
+def test_remap_ground_truth_white_blue_tour():
+    """The strongest test in this suite: white-blue-tour.json was created from
+    purple-pink-tour.json by exactly this operation and verified on the lamp."""
+    pp = frames(load_preset("purple-pink-tour"))
+    wb = frames(load_preset("white-blue-tour"))
+    mapping = {"8000FF": "FFFFFF", "FFC0CB": "0000FF"}
+    for purple, expected in zip(pp, wb):
+        assert motions.remap_colors(purple, mapping) == expected
+
+
+def test_remap_untouched_outside_blocks():
+    """Motion fields that happen to contain hex-like strings are never modified."""
+    # 'ffff' appears in the X6 motion field here — must stay untouched.
+    d50 = "N01:P10002FF00000000FFF2100020058006CU3X6ff02ffff000640000E1;"
+    out = motions.remap_colors(d50, {"FF0000": "00FF00", "0000FF": "FFFFFF"})
+    assert out == "N01:P1000200FF00FFFFFFF2100020058006CU3X6ff02ffff000640000E1;"
+
+
+def test_remap_case_insensitive_match_uppercase_write():
+    d50 = "N01:P10001ffaa00F21000100C4U3V3000640000E1;"
+    out = motions.remap_colors(d50, {"FFAA00": "00ff00"})
+    assert out == "N01:P1000100FF00F21000100C4U3V3000640000E1;"
+
+
+def test_remap_unmapped_colors_keep_original_bytes():
+    # lowercase 'ffffff' not in mapping -> stays lowercase.
+    d50 = "N02:P10001ffffffR6X6000200000102ffffU504T2F70101000000064S20130W610000009801c8;"
+    out = motions.remap_colors(d50, {"8000FF": "FF0000"})
+    assert out == d50
+
+
+# --- recolor -----------------------------------------------------------------------
+
+
+def test_recolor_cycles_palette():
+    """A 3-color motion recolored with 2 colors cycles: [A, B, A]."""
+    out = motions.recolor(N03_MULTIBLOCK, ["111111", "222222"])
+    blocks = motions.find_palette_blocks(out)
+    assert blocks[0].colors == ["111111", "222222"]    # 8000FF->1, FFC0CB->2
+    assert blocks[1].colors == ["111111"]              # 00004D -> cycles back to 1
+
+
+def test_recolor_per_ring_consistency():
+    """All three ring sections get the same substitution."""
+    out = motions.recolor(PER_RING, ["AA0000", "00BB00"])
+    blocks = motions.find_palette_blocks(out)
+    assert len(blocks) == 3
+    assert blocks[0].colors == blocks[1].colors == blocks[2].colors
+    # 5 distinct colors cycled onto 2: [AA0000, 00BB00, AA0000, 00BB00, AA0000]
+    assert blocks[0].colors == ["AA0000", "00BB00", "AA0000", "00BB00", "AA0000"]
+
+
+def test_recolor_preserves_motion_signature():
+    """Recoloring never changes a motion's identity."""
+    out = motions.recolor(N02_CHRISTMAS, ["123456", "654321"])
+    assert motions.motion_signature(out) == motions.motion_signature(N02_CHRISTMAS)
+
+
+def test_recolor_rejects_p4():
+    import pytest
+    with pytest.raises(ValueError, match="P4"):
+        motions.recolor(P4_CYBERPUNK, ["FF0000"])
+
+
+def test_recolor_rejects_bad_input():
+    import pytest
+    with pytest.raises(ValueError):
+        motions.recolor(N01_SOLID, [])                  # empty palette
+    with pytest.raises(ValueError):
+        motions.recolor(N01_SOLID, ["not-hex"])         # bad color
+    with pytest.raises(ValueError):
+        motions.recolor("U3V3000640000E1;", ["FF0000"])  # no palette blocks

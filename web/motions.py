@@ -120,3 +120,54 @@ def motion_signature(d50) -> tuple[str, str]:
         d50 = ""
     return (_sha1(_masked(d50, mask_counts=False)),
             _sha1(_masked(d50, mask_counts=True)))
+
+
+# --- recoloring -----------------------------------------------------------------
+
+
+def remap_colors(d50: str, mapping: dict) -> str:
+    """Replace palette-block colors per an explicit old→new mapping.
+
+    Case-insensitive matching; replacements written uppercase; unmapped colors and
+    every byte outside palette blocks untouched. This is exactly the operation that
+    produced presets/white-blue-tour.json from purple-pink-tour.json (lamp-verified
+    2026-05-28) — see test_remap_ground_truth_white_blue_tour.
+    """
+    norm = {k.upper(): v.upper() for k, v in mapping.items()}
+    blocks = find_palette_blocks(d50)
+    parts = []
+    pos = 0
+    for b in blocks:
+        parts.append(d50[pos:b.start])
+        for i in range(b.count):
+            original = d50[b.start + i * 6:b.start + (i + 1) * 6]
+            replacement = norm.get(original.upper())
+            parts.append(replacement if replacement is not None else original)
+        pos = b.start + b.count * 6
+    parts.append(d50[pos:])
+    return "".join(parts)
+
+
+def recolor(d50: str, new_palette: list) -> str:
+    """Re-render a motion in a new palette.
+
+    The d50's distinct colors (order of appearance) map onto new_palette, cycling
+    if the motion has more distinct colors than the palette provides. Substitutes
+    every distinct color, including incidental program colors — the user's palette
+    fully owns the motion (see spec, Section 1).
+    """
+    if has_p4_block(d50):
+        raise ValueError("d50 contains a P4 block (structure unconfirmed); not recolorable")
+    distinct = extract_palette(d50)
+    if not distinct:
+        raise ValueError("d50 has no palette blocks; nothing to recolor")
+    if not new_palette:
+        raise ValueError("new_palette must contain at least one color")
+    palette = []
+    for c in new_palette:
+        cu = str(c).upper()
+        if not _HEX6_RE.fullmatch(cu):
+            raise ValueError(f"color {c!r} is not a 6-hex color")
+        palette.append(cu)
+    mapping = {old: palette[i % len(palette)] for i, old in enumerate(distinct)}
+    return remap_colors(d50, mapping)
