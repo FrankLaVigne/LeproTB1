@@ -373,3 +373,32 @@ def test_save_catalog_is_atomic(tmp_path):
     assert json.loads(path.read_text()) == {"motions": []}
     # No stray temp files left behind.
     assert list(tmp_path.glob("*.tmp")) == []
+
+
+# --- server._recolor_preset delegation ----------------------------------------------
+
+
+def test_server_recolor_preset_handles_per_ring_frames():
+    """_recolor_preset previously only recolored the FIRST palette block; per-ring
+    frames have 3+. After delegating to motions.remap_colors all blocks change."""
+    from web.server import _recolor_preset
+    preset = {"frames": [{"d2": 2, "d50": PER_RING}]}
+    out = _recolor_preset(
+        preset,
+        ["00FF80", "59FFFF", "8000FF", "FF0080", "FF8000"],
+        ["111111", "222222", "333333", "444444", "555555"])
+    blocks = motions.find_palette_blocks(out["frames"][0]["d50"])
+    assert len(blocks) == 3
+    for b in blocks:    # ALL ring sections recolored, not just the first
+        assert b.colors == ["111111", "222222", "333333", "444444", "555555"]
+
+
+def test_server_recolor_preset_still_positional():
+    """Existing behavior must hold: positional old->new mapping, same length required."""
+    from web.server import _recolor_preset
+    import pytest as _pytest
+    preset = {"frames": [{"d50": N01_SOLID}]}
+    out = _recolor_preset(preset, ["FFAA00"], ["00FF00"])
+    assert "00FF00" in out["frames"][0]["d50"]
+    with _pytest.raises(ValueError):
+        _recolor_preset(preset, ["FFAA00"], ["00FF00", "0000FF"])    # length mismatch

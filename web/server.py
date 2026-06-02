@@ -107,9 +107,10 @@ def _sanitize_name(name: str) -> str:
 def _recolor_preset(preset: dict, old_palette: list, new_palette: list) -> dict:
     """Return a deep copy of ``preset`` with palette colors mapped old → new.
 
-    Only the P1000<N><colors> section of each frame's d50 is modified;
-    motion/length/effect fields are untouched. The mapping is positional:
-    ``old_palette[i]`` → ``new_palette[i]``.
+    Every P1000<N><colors> block of each frame's d50 is remapped (delegates to
+    web.motions.remap_colors — fixes the old first-block-only behavior that broke
+    per-ring frames); motion/length/effect fields are untouched. The mapping is
+    positional: ``old_palette[i]`` → ``new_palette[i]``.
     """
     out = copy.deepcopy(preset)
     if len(old_palette) != len(new_palette):
@@ -119,20 +120,7 @@ def _recolor_preset(preset: dict, old_palette: list, new_palette: list) -> dict:
     def remap_d50(d50: str) -> str:
         if not d50:
             return d50
-        m = re.search(r"P1000(\d)([0-9A-Fa-f]+)", d50)
-        if not m:
-            return d50
-        n = int(m.group(1))
-        head = d50[:m.end(1)]   # everything up to and including the count digit
-        original = m.group(2)
-        block = original[:n * 6]
-        tail = d50[m.end(1) + len(block):]
-        # Map each 6-hex slot through the mapping.
-        new_block = ""
-        for i in range(n):
-            slot = block[i * 6:i * 6 + 6].upper()
-            new_block += mapping.get(slot, slot)
-        return head + new_block + tail
+        return _motions_mod.remap_colors(d50, mapping)
 
     if "frames" in out:
         for f in out.get("frames") or []:
