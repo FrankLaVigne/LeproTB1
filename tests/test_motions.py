@@ -341,3 +341,35 @@ def test_rebuild_skips_catalog_file_itself(tmp_path):
 
 def test_load_catalog_missing_file(tmp_path):
     assert motions.load_catalog(tmp_path / "nope.json") == {"motions": []}
+
+
+def test_merge_tolerates_catalog_missing_motions_key():
+    """A malformed catalog (valid JSON, no 'motions' key) must not crash merges."""
+    catalog = {}
+    result = motions.merge_preset(catalog, make_preset(N01_SOLID), "p")
+    assert result == {"new": 1, "known": 0, "total": 1}
+    assert len(catalog["motions"]) == 1
+
+
+def test_load_catalog_normalizes_malformed_content(tmp_path):
+    """Corrupt or shapeless catalog files load as empty catalogs, never raise."""
+    p1 = tmp_path / "empty-object.json"
+    p1.write_text("{}")
+    assert motions.load_catalog(p1) == {"motions": []}
+
+    p2 = tmp_path / "not-a-dict.json"
+    p2.write_text('["array"]')
+    assert motions.load_catalog(p2) == {"motions": []}
+
+    p3 = tmp_path / "corrupt.json"
+    p3.write_text("{not json at all")
+    assert motions.load_catalog(p3) == {"motions": []}
+
+
+def test_save_catalog_is_atomic(tmp_path):
+    """save_catalog never leaves a partial file behind (writes via temp + rename)."""
+    path = tmp_path / "motions.json"
+    motions.save_catalog({"motions": []}, path)
+    assert json.loads(path.read_text()) == {"motions": []}
+    # No stray temp files left behind.
+    assert list(tmp_path.glob("*.tmp")) == []

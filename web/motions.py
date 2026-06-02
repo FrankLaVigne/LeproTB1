@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -181,15 +182,26 @@ CATALOG_FILENAME = "motions.json"
 
 
 def load_catalog(path) -> dict:
-    """Read a catalog file; a missing file is an empty catalog."""
+    """Read a catalog file; a missing, malformed, or corrupt file is an empty catalog."""
     path = Path(path)
     if not path.exists():
         return {"motions": []}
-    return json.loads(path.read_text())
+    try:
+        data = json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return {"motions": []}
+    if not isinstance(data, dict):
+        return {"motions": []}
+    data.setdefault("motions", [])
+    return data
 
 
 def save_catalog(catalog: dict, path) -> None:
-    Path(path).write_text(json.dumps(catalog, indent=2) + "\n")
+    """Write the catalog atomically (names are user data — never risk a partial write)."""
+    path = Path(path)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(catalog, indent=2) + "\n")
+    os.replace(tmp, path)
 
 
 def _preset_frames(preset: dict) -> list:
@@ -207,6 +219,7 @@ def merge_preset(catalog: dict, preset: dict, preset_name: str) -> dict:
     order; known motions accumulate sources and strict variants. User-assigned
     ``name`` fields are never touched. Returns ``{"new", "known", "total"}``.
     """
+    catalog.setdefault("motions", [])
     by_loose = {m["loose_sig"]: m for m in catalog["motions"]}
     new = known = 0
     for idx, frame in enumerate(_preset_frames(preset)):
