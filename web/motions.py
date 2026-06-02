@@ -12,8 +12,10 @@ Spec: docs/superpowers/specs/2026-06-02-motion-library-design.md
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 # A P1000 palette block: 'P1000' + single count digit + count*6 hex color chars.
 _P1000_RE = re.compile(r"P1000(\d)")
@@ -171,3 +173,112 @@ def recolor(d50: str, new_palette: list) -> str:
         palette.append(cu)
     mapping = {old: palette[i % len(palette)] for i, old in enumerate(distinct)}
     return remap_colors(d50, mapping)
+
+
+# --- catalog --------------------------------------------------------------------
+
+CATALOG_FILENAME = "motions.json"
+
+
+def load_catalog(path) -> dict:
+    """Read a catalog file; a missing file is an empty catalog."""
+    path = Path(path)
+    if not path.exists():
+        return {"motions": []}
+    return json.loads(path.read_text())
+
+
+def save_catalog(catalog: dict, path) -> None:
+    Path(path).write_text(json.dumps(catalog, indent=2) + "\n")
+
+
+def _preset_frames(preset: dict) -> list:
+    """Frames of a preset, regardless of single-payload vs frames shape."""
+    if "frames" in preset:
+        return preset.get("frames") or []
+    payload = preset.get("payload")
+    return [payload] if payload else []
+
+
+def merge_preset(catalog: dict, preset: dict, preset_name: str) -> dict:
+    """Merge one preset's frames into the catalog (mutates ``catalog``).
+
+    Dedup key is the loose signature. New motions get auto-IDs in discovery
+    order; known motions accumulate sources and strict variants. User-assigned
+    ``name`` fields are never touched. Returns ``{"new", "known", "total"}``.
+    """
+    by_loose = {m["loose_sig"]: m for m in catalog["motions"]}
+    new = known = 0
+    for idx, frame in enumerate(_preset_frames(preset)):
+        d50 = (frame or {}).get("d50")
+        if not d50 or not isinstance(d50, str):
+            continue
+        # P4-only frames have no P1000 blocks but are still real motions —
+        # catalog them (non-recolorable). Frames with no palette-ish content at
+        # all (no P1000, no P4) can't be identified and are skipped.
+        if not find_palette_blocks(d50) and not has_p4_block(d50):
+            continue
+        strict, loose = motion_signature(d50)
+        source = f"{preset_name}[{idx}]"
+        entry = by_loose.get(loose)
+        if entry is None:
+            entry = {
+                "id": f"motion-{len(catalog['motions']) + 1:03d}",
+                "name": None,
+                "loose_sig": loose,
+                "strict_variants": [strict],
+                "reference": {
+                    "d50": d50,
+                    "palette": extract_palette(d50),
+                    "source": source,
+                },
+                "format": detect_format(d50),
+                "recolorable": is_recolorable(d50),
+                "sources": [source],
+                "first_seen": preset.get("captured") or "",
+            }
+            catalog["motions"].append(entry)
+            by_loose[loose] = entry
+            new += 1
+        else:
+            if source not in entry["sources"]:
+                entry["sources"].append(source)
+            if strict not in entry["strict_variants"]:
+                entry["strict_variants"].append(strict)
+            known += 1
+    return {"new": new, "known": known, "total": len(catalog["motions"])}
+
+
+def rebuild_catalog(presets_dir, catalog_path) -> dict:
+    """Scan ``presets_dir`` for *.json presets and merge every one into the catalog.
+
+    Deterministic (sorted filename order) and idempotent. The catalog file itself
+    is never ingested even if it lives inside presets_dir.
+    """
+    presets_dir = Path(presets_dir)
+    catalog = load_catalog(catalog_path)
+    totals = {"new": 0, "known": 0}
+    for path in sorted(presets_dir.glob("*.json")):
+        if path.name == CATALOG_FILENAME:
+            continue
+        try:
+            preset = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        result = merge_preset(catalog, preset, path.stem)
+        totals["new"] += result["new"]
+        totals["known"] += result["known"]
+    save_catalog(catalog, catalog_path)
+    return {**totals, "total": len(catalog["motions"])}
+
+
+def main() -> None:
+    """CLI: ``python -m web.motions`` — rebuild the catalog from presets/."""
+    root = Path(__file__).resolve().parent.parent
+    result = rebuild_catalog(root / "presets", root / CATALOG_FILENAME)
+    print(f"catalog: {result['total']} motions "
+          f"({result['new']} new, {result['known']} known frames this run)")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,2045 @@
+{
+  "motions": [
+    {
+      "id": "motion-001",
+      "name": null,
+      "loose_sig": "6b070cd2bddc3ed1b7f26473d3d8f29a0af6689e",
+      "strict_variants": [
+        "c29032e89753566e5c986475253aa6f0c0e0b0b3"
+      ],
+      "reference": {
+        "d50": "N01:P100053A3AA65959FFAC59FFFF0080FFFFFFT2F210001r0000000001080000S20384U202020000X6ff01000001010000R301011;",
+        "palette": [
+          "3A3AA6",
+          "5959FF",
+          "AC59FF",
+          "FF0080",
+          "FFFFFF"
+        ],
+        "source": "capture-2026-06-01-2056-1[0]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "capture-2026-06-01-2056-1[0]"
+      ],
+      "first_seen": "2026-06-01"
+    },
+    {
+      "id": "motion-002",
+      "name": null,
+      "loose_sig": "6de9fb9b2247e50928700a5db9e995fd3b18222c",
+      "strict_variants": [
+        "b96f86d368af01da5ed892e9e036e195d4cbccba"
+      ],
+      "reference": {
+        "d50": "N01:P1000600BFFFB3D9FFFFFFFFFFFF59FFAC59AC59FFU200000003T2F300101S204b0O701X60000000001020000R302111;",
+        "palette": [
+          "00BFFF",
+          "B3D9FF",
+          "FFFFFF",
+          "FFFF59",
+          "FFAC59",
+          "AC59FF"
+        ],
+        "source": "capture-2026-06-01-2056-1[1]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "capture-2026-06-01-2056-1[1]"
+      ],
+      "first_seen": "2026-06-01"
+    },
+    {
+      "id": "motion-003",
+      "name": null,
+      "loose_sig": "f094434c1f11f2c046383b2f49d667f74037c435",
+      "strict_variants": [
+        "16be7a5eb0400595470e568fa568798867632e3a"
+      ],
+      "reference": {
+        "d50": "N03:P100065959FFB3D9FFFFFFFFAC59FFFF0040FFBF00U3F210001r0106fffe00000002V3002640960;P600U3F210001r0103ffff00000001V30126404b0;P1000100004dU3V3030640000R302111;",
+        "palette": [
+          "5959FF",
+          "B3D9FF",
+          "FFFFFF",
+          "AC59FF",
+          "FF0040",
+          "FFBF00",
+          "00004D"
+        ],
+        "source": "capture-2026-06-01-2056-1[2]"
+      },
+      "format": "N03",
+      "recolorable": true,
+      "sources": [
+        "capture-2026-06-01-2056-1[2]"
+      ],
+      "first_seen": "2026-06-01"
+    },
+    {
+      "id": "motion-004",
+      "name": null,
+      "loose_sig": "3b9751c25d6aa7320abbee2f3266608533b6dfed",
+      "strict_variants": [
+        "4c98f639a56dd4d1906675b72f20cf16aba331aa"
+      ],
+      "reference": {
+        "d50": "N03:P100054000FFAC59FFFF59D600BFFFFFFFFFU3F210001r0106fffe00000002V30026405b6;P600U3F210001r0103ffff00000001V30126402db;P1000100004dU3V3030640000R302011;",
+        "palette": [
+          "4000FF",
+          "AC59FF",
+          "FF59D6",
+          "00BFFF",
+          "FFFFFF",
+          "00004D"
+        ],
+        "source": "capture-2026-06-01-2056-1[3]"
+      },
+      "format": "N03",
+      "recolorable": true,
+      "sources": [
+        "capture-2026-06-01-2056-1[3]"
+      ],
+      "first_seen": "2026-06-01"
+    },
+    {
+      "id": "motion-005",
+      "name": null,
+      "loose_sig": "65d7aca71a9e241d116495e26f580da522b091b3",
+      "strict_variants": [
+        "77fa67fe37e1e76027806f1407ab188717b65876",
+        "01ac9072bfa6d95379f2487d8fdc8c72ecfb6477",
+        "c7e4aa107676a35273be9183840f892a30d01cfc"
+      ],
+      "reference": {
+        "d50": "N02:P10002FF0000008000U510F2100010f01V3001640396;P600F210001s00000001U635ca000000000002000002020000R301111;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[0]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "christmas[0]",
+        "christmas[4]",
+        "cyberpunk[1]",
+        "purple-pink-tour[3]",
+        "white-blue-tour[3]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-006",
+      "name": null,
+      "loose_sig": "b3141f149c1f7391be8896ba8af54a7a2be143c4",
+      "strict_variants": [
+        "19485bdbc0199c4756cb844d2eccb5c57a805ce1"
+      ],
+      "reference": {
+        "d50": "N03:P10002FF0000008000U201200001T2X2M2O701F300101S202fcV3010640000;P600U202200002T2X2M2O701F300101S205f8V3010640000;P600U203200003T2X2M2O701F300101S208f4V3010640000;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[1]"
+      },
+      "format": "N03",
+      "recolorable": true,
+      "sources": [
+        "christmas[1]",
+        "purple-pink-tour[2]",
+        "white-blue-tour[2]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-007",
+      "name": null,
+      "loose_sig": "dfec316697ea8b6f79f0950accc4dca195d8f93b",
+      "strict_variants": [
+        "2352d24283d4cae8fa364e16ad75f8803a13fbda"
+      ],
+      "reference": {
+        "d50": "N01:P10002FF0000008000T2F200001r0000000001080000S20132O701U201020000X6ff02000001020000R302111;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[2]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "christmas[2]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-008",
+      "name": null,
+      "loose_sig": "85062919bd90f2c148ba1d116b6d380534b8f641",
+      "strict_variants": [
+        "21c868c62039eab6b147736092178cc5e127fbab"
+      ],
+      "reference": {
+        "d50": "#V:1;N01:P10003FF0000008000FF0000U3R6F70101000010064T2X3S201caO701;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[3]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "christmas[3]",
+        "purple-pink-tour[24]",
+        "white-blue-tour[24]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-009",
+      "name": null,
+      "loose_sig": "359e3ee475b3fb54203521d09464424aa375a44e",
+      "strict_variants": [
+        "391e242090d38c3b228a8bfe33a73f5ec2eab87b"
+      ],
+      "reference": {
+        "d50": "N01:P10002FF0000008000U504F2100010101S40098X60000ffff00000000;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[5]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "christmas[5]",
+        "christmas[7]",
+        "purple-pink-tour[14]",
+        "white-blue-tour[14]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-010",
+      "name": null,
+      "loose_sig": "28d7e5ea54880e3f7b8808299602226c5a936be8",
+      "strict_variants": [
+        "458d90880dbabb3662d3656fdb74893de7e74f32"
+      ],
+      "reference": {
+        "d50": "N01:P10002FF0000008000U702F70102000010064V30026404c8R301011O604c8;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[6]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "christmas[6]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-011",
+      "name": null,
+      "loose_sig": "c58444e385e06ce77c93af6de0a80cceb1199da4",
+      "strict_variants": [
+        "d9df65c7f32f13367152ca951d9776a09d4dd7b1"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000003ec4000000002ec400000000;#I00:N02:P10003FF0000008000FF0000U701R301011F200001r0101ffff00000001V30026402dfO602df;P10001ffffffU3R301011V3030350000;#I01:N02:P10003FF0000008000FF0000U701R301011F200001r0101ffff00000001V30026401eaO602df;P10001ffffffU3R301011V3030350000;#I02:N02:P10003FF0000008000FF0000U701R301011F200001r0101ffff00000001V30026400f5O602df;P10001ffffffU3R301011V3030350000;",
+        "palette": [
+          "FF0000",
+          "008000",
+          "FFFFFF"
+        ],
+        "source": "christmas[8]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "christmas[8]",
+        "purple-pink-tour[20]",
+        "white-blue-tour[20]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-012",
+      "name": null,
+      "loose_sig": "c70baa57cb235642816095161ceb936292fa75d5",
+      "strict_variants": [
+        "f21f0b3bacf1c4241a9f432cfd369c662abde8d0"
+      ],
+      "reference": {
+        "d50": "N01:P10002FF0000008000U203020000X6ff02000000010000F600060005E4003d000000b72064M2S20600;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[9]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "christmas[9]",
+        "purple-pink-tour[11]",
+        "white-blue-tour[11]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-013",
+      "name": null,
+      "loose_sig": "96b678573a766b505caee4d4eabce3207939a863",
+      "strict_variants": [
+        "3ace3f4bd3a13ff583595d7a1a8c37a9c878df71"
+      ],
+      "reference": {
+        "d50": "N02:P10002FF0000008000U4T2X5F2000040201040103010501E40132000001320064I70264O6072c;P600U4T2X5F20000204010601E40000000003960064I70396V3030640000O6072c;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[10]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "christmas[10]",
+        "purple-pink-tour[4]",
+        "white-blue-tour[4]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-014",
+      "name": null,
+      "loose_sig": "69002620226ff2a7dd90bfa7f9e2f736e0028f43",
+      "strict_variants": [
+        "4097abd0606f707888af1e3755121485ee880e6f"
+      ],
+      "reference": {
+        "d50": "N01:P10002FF0000008000U3F310101E30132O60096;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[11]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "christmas[11]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-015",
+      "name": null,
+      "loose_sig": "491dc0857278eedca9c16e54d860a2a0b6e04f39",
+      "strict_variants": [
+        "5dc451baed6fa13a2af75ec3f68774a9a2700cf3"
+      ],
+      "reference": {
+        "d50": "N01:P10002FF0000008000U704F70104000010064V3002640990R301111O60990;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[12]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "christmas[12]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-016",
+      "name": null,
+      "loose_sig": "5e03e92241520a5e5637c567c60b27ea2c825662",
+      "strict_variants": [
+        "0bc7786c54e1a46bcebda26389f2a36a1a5a9757"
+      ],
+      "reference": {
+        "d50": "N01:P10002FF0000008000U200000003T2F300101S201caO701X60000000001020000R302111;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[13]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "christmas[13]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-017",
+      "name": null,
+      "loose_sig": "a35ae91ee474eaf0a5110bde699dbb3c92e37c25",
+      "strict_variants": [
+        "c41af59628b6378f9a430dbecca1348024b37ca3"
+      ],
+      "reference": {
+        "d50": "N01:P10002FF0000008000U704F200001r0104000001040000V3002640990R302111O60990;",
+        "palette": [
+          "FF0000",
+          "008000"
+        ],
+        "source": "christmas[14]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "christmas[14]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-018",
+      "name": null,
+      "loose_sig": "85cd92ae5835086c7150ba43e1e386e0e8cc5e26",
+      "strict_variants": [
+        "b73818aa2d514c83716d43acfd4f1daf619c492c"
+      ],
+      "reference": {
+        "d50": "N01:P10006FF00BF59FFFF0040FF00FF80FFFF59FF8000U3F310101E30138O60064;",
+        "palette": [
+          "FF00BF",
+          "59FFFF",
+          "0040FF",
+          "00FF80",
+          "FFFF59",
+          "FF8000"
+        ],
+        "source": "cyberpunk[0]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[0]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-019",
+      "name": null,
+      "loose_sig": "29d6cb3a7f1cdf289bcb04a69069c7c949d36c3c",
+      "strict_variants": [
+        "73264c7acb6b8485195d982a117a3f7c9ce1e0ea",
+        "4b2c58a647d65e3120c11d45f657b82c60ba8ece"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000003ec4000000002ec400000000;N02:P100050000FF00BFFFFF00BFFF4000FFFF59U510F2100010f01V3001640258;P600F210001s00000001U62328000000000002000002020000R301111;",
+        "palette": [
+          "0000FF",
+          "00BFFF",
+          "FF00BF",
+          "FF4000",
+          "FFFF59"
+        ],
+        "source": "cyberpunk[2]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[2]",
+        "cyberpunk[12]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-020",
+      "name": null,
+      "loose_sig": "48a78af45d952806b666a65d6f4f5588545873e0",
+      "strict_variants": [
+        "a18763e42ee579ad4b6c057e71942c80e1dda207"
+      ],
+      "reference": {
+        "d50": "N02:P1000559FFAC59FFFF8000FFFF00FFFF4000U4T2X5F2000040201040103010501E40138000001380064I70270O60750;P600U4T2X5F20000204010601E40000000003a80064I703a8V3030640000O60750;",
+        "palette": [
+          "59FFAC",
+          "59FFFF",
+          "8000FF",
+          "FF00FF",
+          "FF4000"
+        ],
+        "source": "cyberpunk[3]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[3]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-021",
+      "name": null,
+      "loose_sig": "b628c4323c006766efc3547c9f045b1551f9042f",
+      "strict_variants": [
+        "226d094161abdc405f997ca5e564467f60dac734"
+      ],
+      "reference": {
+        "d50": "N01:P1000659FFFF59FFAC8000FFFF00BFFF8000FFFF00U706F601060000V3002641c20R301011;",
+        "palette": [
+          "59FFFF",
+          "59FFAC",
+          "8000FF",
+          "FF00BF",
+          "FF8000",
+          "FFFF00"
+        ],
+        "source": "cyberpunk[4]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[4]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-022",
+      "name": null,
+      "loose_sig": "e8e9e74f0fe4950f6d5ced39a866d73fffc00042",
+      "strict_variants": [
+        "f49587538379b2a8191d068f50b98bbc2c21c8dd",
+        "e943ef7d22ead33ef66f2a1f234deb090ac8c757"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000203ec4000000102ec400000000;#I00:N01:P1000500FF8059FFFF8000FFFF0080FF8000U200010001T2X2S20283O61418;#I01:N01:P1000500FF8059FFFF8000FFFF0080FF8000U200010001T2X2S22830O62830;#I02:N01:P1000500FF8059FFFF8000FFFF0080FF8000U200010001T2X2S28300O68300;",
+        "palette": [
+          "00FF80",
+          "59FFFF",
+          "8000FF",
+          "FF0080",
+          "FF8000"
+        ],
+        "source": "cyberpunk[5]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[5]",
+        "cyberpunk[8]",
+        "cyberpunk[20]",
+        "hulk[4]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-023",
+      "name": null,
+      "loose_sig": "ef9798c2548bf08c5fee3bb336ced64c3952bed7",
+      "strict_variants": [
+        "e62e7cc3b94e55f4004476ef8c40860aa8a8a256"
+      ],
+      "reference": {
+        "d50": "N01:P1000659FFFFFF00BF8000FF00FF80FFBF00FF4000U3E400e101c200e10064O60384R301111;",
+        "palette": [
+          "59FFFF",
+          "FF00BF",
+          "8000FF",
+          "00FF80",
+          "FFBF00",
+          "FF4000"
+        ],
+        "source": "cyberpunk[6]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[6]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-024",
+      "name": null,
+      "loose_sig": "9aed1c78de752e5672b52bd172a48b9c8a00e33e",
+      "strict_variants": [
+        "d178e5fa7b76d541cf32ec471a38dd2bd09ffcea"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000003ec4000000002ec400000000;N02:P10006FF00BF8000FF59FFFF4000FF00FF80FFFFFFU510F2100010f01V3001640183;P600F210001s00000001U616ad000000000002000002020000R301111;",
+        "palette": [
+          "FF00BF",
+          "8000FF",
+          "59FFFF",
+          "4000FF",
+          "00FF80",
+          "FFFFFF"
+        ],
+        "source": "cyberpunk[7]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[7]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-025",
+      "name": null,
+      "loose_sig": "799f037f465ad4748ddbede25bd369ed0ba47bf4",
+      "strict_variants": [
+        "16995012eb03a3f9ff655435273cc260b3769f5c"
+      ],
+      "reference": {
+        "d50": "N01:P100050000FF59FFFFFF00BFFF4000FFBF00U705F70105000000064V3002640ea6R301011;",
+        "palette": [
+          "0000FF",
+          "59FFFF",
+          "FF00BF",
+          "FF4000",
+          "FFBF00"
+        ],
+        "source": "cyberpunk[9]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[9]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-026",
+      "name": null,
+      "loose_sig": "237b01110440f68e95c36222704b3f7fde932203",
+      "strict_variants": [
+        "9037d9f257a0b2b550ec38028ff3c1fb5ccd66b7",
+        "f6397ae3425d28c3f81ab77a378c05159fe0efc2"
+      ],
+      "reference": {
+        "d50": "N02:P10001ffffffR6X6000200000102ffffU504T2F70101000000064S201c2W61000000e102a3;P1000659FFFF00FFBF8000FFFF00BFFF8000FFFF00U600e100e100e10002000101020000T2F210003r0110000001400000r0310000001400000r0210000001400000R302111W6100e102a302a3;",
+        "palette": [
+          "FFFFFF",
+          "59FFFF",
+          "00FFBF",
+          "8000FF",
+          "FF00BF",
+          "FF8000",
+          "FFFF00"
+        ],
+        "source": "cyberpunk[10]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[10]",
+        "hulk[9]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-027",
+      "name": null,
+      "loose_sig": "13b03c07c5e11e0bab812f815953cf54008dc883",
+      "strict_variants": [
+        "f3176684e650bbc8bfc2dc38d40fac6c79b6ffd5"
+      ],
+      "reference": {
+        "d50": "N01:P10006FF0040FF8000FFFF0000FF8000BFFF8000FFU70cF7010c000010064V30026423d0E40064000000642064R301011;",
+        "palette": [
+          "FF0040",
+          "FF8000",
+          "FFFF00",
+          "00FF80",
+          "00BFFF",
+          "8000FF"
+        ],
+        "source": "cyberpunk[11]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[11]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-028",
+      "name": null,
+      "loose_sig": "4e3abc0d6d85a48cf85a3f0e9056b28dd732b79b",
+      "strict_variants": [
+        "804207f7e74241011527829a36acab053fc3469a",
+        "09de7ee4705a6405b8b574158234644cc7be24aa"
+      ],
+      "reference": {
+        "d50": "N01:P1000500BFFF8000FFFF00FF00FFBF0040FFU504F2100010001S400e1X60000ffff00000000;",
+        "palette": [
+          "00BFFF",
+          "8000FF",
+          "FF00FF",
+          "00FFBF",
+          "0040FF"
+        ],
+        "source": "cyberpunk[13]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[13]",
+        "hulk[0]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-029",
+      "name": null,
+      "loose_sig": "733df124a31ba15dd7575f3a5803fc132d204b7e",
+      "strict_variants": [
+        "6dcab2ba115764a3fe45aa093297d8be9816721e"
+      ],
+      "reference": {
+        "d50": "N01:P10006FF00BF59FFFF8000FFFFBF0059FFACFF5959U3F310101O60064;",
+        "palette": [
+          "FF00BF",
+          "59FFFF",
+          "8000FF",
+          "FFBF00",
+          "59FFAC",
+          "FF5959"
+        ],
+        "source": "cyberpunk[14]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[14]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-030",
+      "name": null,
+      "loose_sig": "01b14755a0e2ec92cebf46f57d315825085a78c1",
+      "strict_variants": [
+        "7449d2b9d1d97b1ecce9135325ba1bbb1395dd83",
+        "9a533b4e77c95924b94cd3988614cea69a0461ed"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000203ec4000000102ec400000000;#I00:N01:P1000659FFFF40FF00FFFF00FF8000FF00808000FFU200010001T2X2S20098O604c0;#I01:N01:P1000659FFFF40FF00FFFF00FF8000FF00808000FFU200010001T2X2S20980O60980;#I02:N01:P1000659FFFF40FF00FFFF00FF8000FF00808000FFU200010001T2X2S29800O69800;",
+        "palette": [
+          "59FFFF",
+          "40FF00",
+          "FFFF00",
+          "FF8000",
+          "FF0080",
+          "8000FF"
+        ],
+        "source": "cyberpunk[15]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[15]",
+        "purple-pink-tour[31]",
+        "white-blue-tour[31]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-031",
+      "name": null,
+      "loose_sig": "bfb4205f448fd16242351253a7ccc8b06596c2fe",
+      "strict_variants": [
+        "98a8b27fde1023bc1c8ae27d142dcfee0353d4a9"
+      ],
+      "reference": {
+        "d50": "N02:P10005FF4000FF00BF5959FF00BFFF59FF59U4T2X5F2100040201040103010501E4010c0000010c0064I70218;P600U4T2X5F21000204010601E40000000003240064I70324V3030640000;",
+        "palette": [
+          "FF4000",
+          "FF00BF",
+          "5959FF",
+          "00BFFF",
+          "59FF59"
+        ],
+        "source": "cyberpunk[16]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[16]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-032",
+      "name": null,
+      "loose_sig": "12c4be544c8eca08d12a11d2b19f85fb1ac2cd0e",
+      "strict_variants": [
+        "d87664d9aa59b0feec14343f60847286d815ec96"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000203ec4000000102ec400000000;#I00:N01:P10006FF00BF8000FF59FFFF00FF80FFBF00FF8000U704R301011F70102000010064V3002640324O60324;#I01:N01:P10006FF00BF8000FF59FFFF00FF80FFBF00FF8000U704R301011F70102000010064V3002640218O60324;#I02:N01:P10006FF00BF8000FF59FFFF00FF80FFBF00FF8000U704R301011F70102000010064V300264010cO60324;",
+        "palette": [
+          "FF00BF",
+          "8000FF",
+          "59FFFF",
+          "00FF80",
+          "FFBF00",
+          "FF8000"
+        ],
+        "source": "cyberpunk[17]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[17]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-033",
+      "name": null,
+      "loose_sig": "ed52724692b63a070c6b48ff0f7d487fea14fcf5",
+      "strict_variants": [
+        "1ed697b5c64dafb3bb20881335c1e7f41dcad13e",
+        "73e1cde1ad9e3f0fd53bb385158c7c9b9878bde4"
+      ],
+      "reference": {
+        "d50": "N01:P1000659FFFFFF00BF8000FF00FF80FFAC59FF5959U706F70106000010064V3002641c20R302011O61c20;",
+        "palette": [
+          "59FFFF",
+          "FF00BF",
+          "8000FF",
+          "00FF80",
+          "FFAC59",
+          "FF5959"
+        ],
+        "source": "cyberpunk[18]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[18]",
+        "cyberpunk[19]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-034",
+      "name": null,
+      "loose_sig": "aae7d2b16c9d9c3a8784b931d5d0a54043970a7c",
+      "strict_variants": [
+        "aae7d2b16c9d9c3a8784b931d5d0a54043970a7c"
+      ],
+      "reference": {
+        "d50": "N01:P40005e500e500e500e500e500U504F2100010001S4009cX60000ffff00000000;",
+        "palette": [],
+        "source": "cyberpunk[21]"
+      },
+      "format": "N01",
+      "recolorable": false,
+      "sources": [
+        "cyberpunk[21]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-035",
+      "name": null,
+      "loose_sig": "60a5811f270b60f8850931bc00fac63bbeba98c5",
+      "strict_variants": [
+        "03eacc8833a2d74ee95e52954fa6aece4776949c",
+        "a7b25e0a5fae987be4981cd4965db3318fc5b18a"
+      ],
+      "reference": {
+        "d50": "N03:P100058000FFFF00BF59FFFF00FFBFFFFFFFU201200001T2X2M2O701F300101S204b0V3010640000;P600U202200002T2X2M2O701F300101S20960V3010640000;P600U203200003T2X2M2O701F300101S20e10V3010640000;",
+        "palette": [
+          "8000FF",
+          "FF00BF",
+          "59FFFF",
+          "00FFBF",
+          "FFFFFF"
+        ],
+        "source": "cyberpunk[22]"
+      },
+      "format": "N03",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[22]",
+        "hulk[20]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-036",
+      "name": null,
+      "loose_sig": "b38e796ab83ff663b90b950e9d483542a0b6759f",
+      "strict_variants": [
+        "5681f8f905773332a2df8ec7bd194ff52025abdf"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000203ec4000258102ec40004b000;#I00:N01:P100050000FF00BFFFFF00BF8000FF00FFBFU4R301011F410001r010200000102000020064V3002640258O60960;#I01:N01:P100050000FF00BFFFFF00BF8000FF00FFBFU4R301011F410001r010200000102000020064V3002640258O60960;#I02:N01:P100050000FF00BFFFFF00BF8000FF00FFBFU4R301011F410001r010200000102000020064V3002640258O60960;",
+        "palette": [
+          "0000FF",
+          "00BFFF",
+          "FF00BF",
+          "8000FF",
+          "00FFBF"
+        ],
+        "source": "cyberpunk[23]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[23]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-037",
+      "name": null,
+      "loose_sig": "04f8707454ef1c3bc14bfbd614986590f8151c6f",
+      "strict_variants": [
+        "7094562dfff406d64d75ce64763ac7c621de060c"
+      ],
+      "reference": {
+        "d50": "N01:P10006FF00BF8000FF59FFFF00FFBF40FF00FFFF00U200000003T2F300101S202dbO701X60000000001020000R302011;",
+        "palette": [
+          "FF00BF",
+          "8000FF",
+          "59FFFF",
+          "00FFBF",
+          "40FF00",
+          "FFFF00"
+        ],
+        "source": "cyberpunk[24]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "cyberpunk[24]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-038",
+      "name": null,
+      "loose_sig": "6998d95727c00406bacb5a6e409266b7e43253cd",
+      "strict_variants": [
+        "522714a07c8c074b43dd068c5e10ee67ea2de37c",
+        "8a925fe4635cfabbb075e61268814a253916970e"
+      ],
+      "reference": {
+        "d50": "#V:1;N01:P1000580FF0040FF00ACFF593AA63AACFF59U3R6F70101000010064T2X3S201faO701;",
+        "palette": [
+          "80FF00",
+          "40FF00",
+          "ACFF59",
+          "3AA63A"
+        ],
+        "source": "hulk[1]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[1]",
+        "hulk[19]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-039",
+      "name": null,
+      "loose_sig": "0f31ed76349038392a00f887e15ebe08dd331aa5",
+      "strict_variants": [
+        "de91a672c4cabb6797a1582b0da01b0369fbbcda"
+      ],
+      "reference": {
+        "d50": "N02:P1000600BF0059FF59FFBF00FF59595959FF59FFACU510F2100010f01V30016403f4;P600F210001s00000001U63b4c000000000002000002020000R302011;",
+        "palette": [
+          "00BF00",
+          "59FF59",
+          "FFBF00",
+          "FF5959",
+          "5959FF",
+          "59FFAC"
+        ],
+        "source": "hulk[2]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "hulk[2]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-040",
+      "name": null,
+      "loose_sig": "645ff442aaa3a45fa0eb4b380ded1d3922a37d18",
+      "strict_variants": [
+        "9bbac4f47956a1a37e9116a20c3909d9aeeffc63"
+      ],
+      "reference": {
+        "d50": "N01:P1000659FF5900BF005959FF59FFACFFBF00FF5959U3F300101E200e100e1O601c2;",
+        "palette": [
+          "59FF59",
+          "00BF00",
+          "5959FF",
+          "59FFAC",
+          "FFBF00",
+          "FF5959"
+        ],
+        "source": "hulk[3]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[3]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-041",
+      "name": null,
+      "loose_sig": "f8a88f898bc517b480bf8595cf3c6b44829ecc9a",
+      "strict_variants": [
+        "6a492cd4830c92187ed2f712c7e39102468a8164"
+      ],
+      "reference": {
+        "d50": "N02:P100013AA63AU510F2000010f01V30016403a9O636e7;P600F200001s00000001U636e7000000000002000002020000R301011O636e7;",
+        "palette": [
+          "3AA63A"
+        ],
+        "source": "hulk[5]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "hulk[5]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-042",
+      "name": null,
+      "loose_sig": "0d86d4cc40d8d8fb8a167b0bb2980a0a6e7b6e29",
+      "strict_variants": [
+        "db69e7c8b6c3545fcc0c54c870eb38cfdbcea53a",
+        "6350e27e7f1cd04e6026eb216eb2a3c6f8a096ae"
+      ],
+      "reference": {
+        "d50": "N01:P1000640FF0080FF00BFFF00FFBF00FF4000800000U3F300101E200980098O60130;",
+        "palette": [
+          "40FF00",
+          "80FF00",
+          "BFFF00",
+          "FFBF00",
+          "FF4000",
+          "800000"
+        ],
+        "source": "hulk[6]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[6]",
+        "purple-pink-tour[7]",
+        "white-blue-tour[7]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-043",
+      "name": null,
+      "loose_sig": "10e1cbddf9a5dccf0ff4aaea03a7b9b0b72a7c30",
+      "strict_variants": [
+        "307750f2000af682bec201217a64aa2f114fc6c3"
+      ],
+      "reference": {
+        "d50": "N01:P100053AA63AACFF59A6703A008000ACFF59U3F310101E301c2O60096;",
+        "palette": [
+          "3AA63A",
+          "ACFF59",
+          "A6703A",
+          "008000"
+        ],
+        "source": "hulk[7]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[7]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-044",
+      "name": null,
+      "loose_sig": "ab929864cc1d22610aca0dd35adf298b64afbd41",
+      "strict_variants": [
+        "2a036498f57aa0078c2b77c91466d396f290123e"
+      ],
+      "reference": {
+        "d50": "N01:P100063AA63A40FF00BFFF00FFBF00FF8000A63A3AT2F210001r0000000001080000S20271U202020000X6ff01000001010000R301111;",
+        "palette": [
+          "3AA63A",
+          "40FF00",
+          "BFFF00",
+          "FFBF00",
+          "FF8000",
+          "A63A3A"
+        ],
+        "source": "hulk[8]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[8]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-045",
+      "name": null,
+      "loose_sig": "3212dc7c740a46aa2faf50ca391c5da8c2e4472c",
+      "strict_variants": [
+        "dab00f7d4b2b336a52a510c1ba3360058f5be0df"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000203ec4000157102ec40002ae00;#I00:N01:P10006808000BFBF00ACFF59A6A63A808000008080U4R301011F410001r010200000102000020064V3002640157O6055c;#I01:N01:P10006808000BFBF00ACFF59A6A63A808000008080U4R301011F410001r010200000102000020064V3002640157O6055c;#I02:N01:P10006808000BFBF00ACFF59A6A63A808000008080U4R301011F410001r010200000102000020064V3002640157O6055c;",
+        "palette": [
+          "808000",
+          "BFBF00",
+          "ACFF59",
+          "A6A63A",
+          "008080"
+        ],
+        "source": "hulk[10]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "hulk[10]",
+        "hulk[15]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-046",
+      "name": null,
+      "loose_sig": "97bf192339dd2b736c64ad058de82f78d58d2557",
+      "strict_variants": [
+        "b249ca052dc224aaa0f19c97f55398224f3e4abc"
+      ],
+      "reference": {
+        "d50": "N01:P1000680FF0000BF0000FF803AA63ABFFF00FFBF00U3F310106V3002642742R301111;",
+        "palette": [
+          "80FF00",
+          "00BF00",
+          "00FF80",
+          "3AA63A",
+          "BFFF00",
+          "FFBF00"
+        ],
+        "source": "hulk[11]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[11]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-047",
+      "name": null,
+      "loose_sig": "d73874178a1eedb929ad46fed3e9b29888e1d7f5",
+      "strict_variants": [
+        "d7a80a487e67c7fca0f9bb80c8c384a43ba4f5c5"
+      ],
+      "reference": {
+        "d50": "N01:P1000680FF003AA63A3AA6A659FFFF5959FFFF0080U504F2100010101S4009cX60000ffff00000000;",
+        "palette": [
+          "80FF00",
+          "3AA63A",
+          "3AA6A6",
+          "59FFFF",
+          "5959FF",
+          "FF0080"
+        ],
+        "source": "hulk[12]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[12]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-048",
+      "name": null,
+      "loose_sig": "f329d89ffa93005aab8e1f57a76e28b41927867a",
+      "strict_variants": [
+        "5c7b3281c07a72d02357fe0d922059aa96666f29"
+      ],
+      "reference": {
+        "d50": "N01:P100053AA63A40FF0080FF00ACFF593AA6A6U3F310105V3002643a98R302011;",
+        "palette": [
+          "3AA63A",
+          "40FF00",
+          "80FF00",
+          "ACFF59",
+          "3AA6A6"
+        ],
+        "source": "hulk[13]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[13]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-049",
+      "name": null,
+      "loose_sig": "da56da7662f193d5aae1ae525838b765d90ba192",
+      "strict_variants": [
+        "4f7a7f8125e27a26e7c1917fdf8d76d86495fe2c"
+      ],
+      "reference": {
+        "d50": "N02:P1000680FF00ACFF593AA63A00FF80FFBF00FF8000U510F2100010f01V30016405dc;P600F210001s00000001U657e4000000000002000002020000R301111;",
+        "palette": [
+          "80FF00",
+          "ACFF59",
+          "3AA63A",
+          "00FF80",
+          "FFBF00",
+          "FF8000"
+        ],
+        "source": "hulk[14]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "hulk[14]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-050",
+      "name": null,
+      "loose_sig": "720597c2e7c1b1b2e2dc4255c1363ad445075409",
+      "strict_variants": [
+        "45d7cb730185767c5fbd8711b143881bfe392907"
+      ],
+      "reference": {
+        "d50": "N01:P100063AA63A40FF0080FF00ACFF5959FFFF5959FFU706F210001r0106000001060000V3002641194R302011;",
+        "palette": [
+          "3AA63A",
+          "40FF00",
+          "80FF00",
+          "ACFF59",
+          "59FFFF",
+          "5959FF"
+        ],
+        "source": "hulk[16]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[16]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-051",
+      "name": null,
+      "loose_sig": "eb0eb420a24f31df34e743e567de3e7323aea2f3",
+      "strict_variants": [
+        "7daf29edf75f9c8f7198a48608e91549c7143e57"
+      ],
+      "reference": {
+        "d50": "N01:P100033AA63AA6A63AA6703AU520F21000200100010V3001640546;",
+        "palette": [
+          "3AA63A",
+          "A6A63A",
+          "A6703A"
+        ],
+        "source": "hulk[17]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[17]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-052",
+      "name": null,
+      "loose_sig": "3a61bb42c4984af5dadba788d0672075ece59dda",
+      "strict_variants": [
+        "70ea7e7bb7573d4e01e94b621282386b8161ac51",
+        "f470326f94027abf86710bf9ce5adbc52effbaf1"
+      ],
+      "reference": {
+        "d50": "N01:P1000680FF0040FF00BFFF00FFBF00FF8000800000T2F200001r0000000001080000S2023fO701U201020000X6ff02000001020000R302011;",
+        "palette": [
+          "80FF00",
+          "40FF00",
+          "BFFF00",
+          "FFBF00",
+          "FF8000",
+          "800000"
+        ],
+        "source": "hulk[18]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[18]",
+        "hulk[21]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-053",
+      "name": null,
+      "loose_sig": "53df19444cc098c43da60a646fd200172eb56bc9",
+      "strict_variants": [
+        "b8ea60092a2e9e74b55514d45d42afa2aeb1729c"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000003ec4000000002ec400000000;#I00:N01:P100040080003AA63AB3FFD9B3FFB3U701R301011F200001r0101ffff00000001V3002640546O60546;#I01:N01:P100040080003AA63AB3FFD9B3FFB3U701R301011F200001r0101ffff00000001V3002640384O60546;#I02:N01:P100040080003AA63AB3FFD9B3FFB3U701R301011F200001r0101ffff00000001V30026401c2O60546;",
+        "palette": [
+          "008000",
+          "3AA63A",
+          "B3FFD9",
+          "B3FFB3"
+        ],
+        "source": "hulk[22]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "hulk[22]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-054",
+      "name": null,
+      "loose_sig": "43373e885950dcd5becb71ee5afbd54d29290b04",
+      "strict_variants": [
+        "e8410ae1cbb05b80944c4ef8f1d2a359f0f003b2"
+      ],
+      "reference": {
+        "d50": "N01:P100043AA63AACFF593AA63ABFFF00U504F2100010101S400e1X60000ffff00000000;",
+        "palette": [
+          "3AA63A",
+          "ACFF59",
+          "BFFF00"
+        ],
+        "source": "hulk[23]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[23]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-055",
+      "name": null,
+      "loose_sig": "5a44c891bd63b5c934d40c967cc8cb42205eff97",
+      "strict_variants": [
+        "fbecf216ce784948dd84d1fa9c8bf22a02c055db"
+      ],
+      "reference": {
+        "d50": "N01:P100055959FF00BF0059FFAC59FF59ACFF59U3F310105V30026420b7R301011;",
+        "palette": [
+          "5959FF",
+          "00BF00",
+          "59FFAC",
+          "59FF59",
+          "ACFF59"
+        ],
+        "source": "hulk[24]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[24]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-056",
+      "name": null,
+      "loose_sig": "9828a918616846406bd94032278e3b47e5fc4665",
+      "strict_variants": [
+        "0004b98c83ee12ddcfdbfb3ab7675d6f2e30f495"
+      ],
+      "reference": {
+        "d50": "N01:P1000559FFAC59FF5900BF003AA63A59FF59U70aF6010a0000V3002642ee0R301011;",
+        "palette": [
+          "59FFAC",
+          "59FF59",
+          "00BF00",
+          "3AA63A"
+        ],
+        "source": "hulk[25]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "hulk[25]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-057",
+      "name": null,
+      "loose_sig": "5464ca99db653324a329df6af88a4b9d5c14b753",
+      "strict_variants": [
+        "c91699158301b58672088afbcf8cf3e133dc0728"
+      ],
+      "reference": {
+        "d50": "N02:P10006FF8000FFAC59BF6000800000BF6000FFBF00U4T2X5F2000040201040103010501E401c2000001c20064I70384O60a8c;P600U4T2X5F20000204010601E40000000005460064I70546V3030640000O60a8c;",
+        "palette": [
+          "FF8000",
+          "FFAC59",
+          "BF6000",
+          "800000",
+          "FFBF00"
+        ],
+        "source": "mars-colors[0]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "mars-colors[0]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-058",
+      "name": null,
+      "loose_sig": "1e1245dd4e3251492aed1a7c9757a2b6e79a88e3",
+      "strict_variants": [
+        "e7a69504ea1b4f44d4c1ed72f940202032c43e76"
+      ],
+      "reference": {
+        "d50": "N02:P10001ffffffR6X6000200000102ffffU504T2F70101000000064S20130W610000009801c8;P100028000FFFFC0CBU60098009800980002000101020000T2F210003r0110000001400000r0310000001400000r0210000001400000R302111W61009801c801c8;",
+        "palette": [
+          "FFFFFF",
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[0]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[0]",
+        "white-blue-tour[0]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-059",
+      "name": null,
+      "loose_sig": "18fb1d198bfcfba3b5ee11ad1518af2ec936b946",
+      "strict_variants": [
+        "07f170d867447739fcbd569c5efe7b5d2635c355"
+      ],
+      "reference": {
+        "d50": "N02:P100028000FFFFC0CBU4T2X5F2100040201040103010501E40098000000980064I70130;P600U4T2X5F21000204010601E40000000001c80064I701c8V3030640000;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[1]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[1]",
+        "white-blue-tour[1]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-060",
+      "name": null,
+      "loose_sig": "87ad1585ee0647150a101d78f3880309a1f5a34a",
+      "strict_variants": [
+        "dac04d23067127728d1afeeb21ec7214ac7d4d7f"
+      ],
+      "reference": {
+        "d50": "N03:P100028000FFFFC0CBU3F210001r0106fffe00000002V3002640394;P600U3F210001r0103ffff00000001V30126401ca;P1000100004dU3V3030640000R301111;",
+        "palette": [
+          "8000FF",
+          "FFC0CB",
+          "00004D"
+        ],
+        "source": "purple-pink-tour[5]"
+      },
+      "format": "N03",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[5]",
+        "white-blue-tour[5]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-061",
+      "name": null,
+      "loose_sig": "2f8e26f7d7fa6600f86bc3e8aef0cb33d2c39824",
+      "strict_variants": [
+        "30d59b88d957bbe3b1201651b93748e186a42f34"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU704F210001r0104000001040000V3002640990R301111;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[6]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[6]",
+        "white-blue-tour[6]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-062",
+      "name": null,
+      "loose_sig": "85e04b6137fcd44bfd088e4bc13f4ec06c01a83e",
+      "strict_variants": [
+        "77729ee8bdcbcbcd8654854ded15a6f9d491b7c8"
+      ],
+      "reference": {
+        "d50": "N02:P100018000FFU3F2100010001E40008000000182064T2X5I70020;P10001ffffffU200010005E200010002S20008T2X6ff01000001010000W61000000200060;",
+        "palette": [
+          "8000FF",
+          "FFFFFF"
+        ],
+        "source": "purple-pink-tour[8]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[8]",
+        "white-blue-tour[8]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-063",
+      "name": null,
+      "loose_sig": "a94f0a96db6eb0572b02a0d0218280722cf7c02f",
+      "strict_variants": [
+        "8ba1bf5f216feff79dfd67b387d43b8bf6e343a5"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU504F2100010001S40098X60000ffff00000000;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[9]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[9]",
+        "white-blue-tour[9]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-064",
+      "name": null,
+      "loose_sig": "18c3b57bc89f797fbf69039e51a77e0339d9eb82",
+      "strict_variants": [
+        "fe20c0ce9ba743dd9e2c869d99eb38e32abdec08"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000203ec4000098102ec400013000;#I00:N01:P100038000FFFFC0CB8000FFU4R301011F410001r010200000102000020064V3002640098O60260;#I01:N01:P100038000FFFFC0CB8000FFU4R301011F410001r010200000102000020064V3002640098O60260;#I02:N01:P100038000FFFFC0CB8000FFU4R301011F410001r010200000102000020064V3002640098O60260;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[10]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[10]",
+        "white-blue-tour[10]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-065",
+      "name": null,
+      "loose_sig": "db14fe189c69d9f9cae80bf1f7230a89b579c951",
+      "strict_variants": [
+        "e6d014aa2b06b39d3ec1b6ca48df620c5c438270"
+      ],
+      "reference": {
+        "d50": "N02:P100028000FFFFC0CBU201020000F601030000S2fe30T2X6ff02000000020000R302111W61000000e8013fI2;P10002000000ffffffU201020000F601010000S2001dT2X6ff02000001020000R302111W6100e80105013f;",
+        "palette": [
+          "8000FF",
+          "FFC0CB",
+          "000000",
+          "FFFFFF"
+        ],
+        "source": "purple-pink-tour[12]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[12]",
+        "white-blue-tour[12]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-066",
+      "name": null,
+      "loose_sig": "618f52acf8a851cdefc225aadfe03160a4708d1c",
+      "strict_variants": [
+        "03184a1986cb3309ac694b07f059206a74b5d383"
+      ],
+      "reference": {
+        "d50": "N02:P100028000FFFFC0CBU510F4100010c0402864V3002640264R301111;P10001ffffffU3R301011V3030350000;",
+        "palette": [
+          "8000FF",
+          "FFC0CB",
+          "FFFFFF"
+        ],
+        "source": "purple-pink-tour[13]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[13]",
+        "white-blue-tour[13]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-067",
+      "name": null,
+      "loose_sig": "474ec5ed60f4aa4f8e4247ca5c16b98335162a45",
+      "strict_variants": [
+        "ee6e13bda3f67f8156339a86116e08825d98f78f"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000203ec4000000102ec400000000;N02:P100038000FFFFC0CB8000FFU510F2000010f01V3001640132O611ee;P600F200001s00000001U611ee000000000002000002020000R301111O611ee;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[15]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[15]",
+        "white-blue-tour[15]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-068",
+      "name": null,
+      "loose_sig": "27d2a8a8064a1d53f9ca17ac9184cd831db5a446",
+      "strict_variants": [
+        "10efbb40f2b047d71e653aef074e2fc34395f478"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000003ec4000000002ec400000000;#I00:N01:P100038000FFFFC0CB8000FFU701R301011F200001r0101ffff00000001V30026402dfO602df;#I01:N01:P100038000FFFFC0CB8000FFU701R301011F200001r0101ffff00000001V30026401eaO602df;#I02:N01:P100038000FFFFC0CB8000FFU701R301011F200001r0101ffff00000001V30026400f5O602df;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[16]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[16]",
+        "white-blue-tour[16]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-069",
+      "name": null,
+      "loose_sig": "91d8b45e564b0d963972e20b12a3e154b49e42c9",
+      "strict_variants": [
+        "526981c88c23008cba95c3c49b2950c5475d0f92"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU702F70102000000064V30026404c8R302111;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[17]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[17]",
+        "white-blue-tour[17]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-070",
+      "name": null,
+      "loose_sig": "f7b59d8b3982ad646f52411fc46af8bb1dc99d14",
+      "strict_variants": [
+        "dae48126d6a6f86b2d388cd93bc29244a58a749a"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU3F300101E40098000000980064O60130;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[18]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[18]",
+        "white-blue-tour[18]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-071",
+      "name": null,
+      "loose_sig": "d5f8d3af225881cb2a7589892356f32031d47069",
+      "strict_variants": [
+        "c85c3aaa9e5c3ef1c77dd3e7a3e5c08801c9ff87"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000203ec4000000102ec400000000;#I00:N01:P100038000FFFFC0CB8000FFU704R301011F70104000010064V300264055eO6055e;#I01:N01:P100038000FFFFC0CB8000FFU704R301011F70104000010064V3002640394O6055e;#I02:N01:P100038000FFFFC0CB8000FFU704R301011F70104000010064V30026401caO6055e;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[19]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[19]",
+        "white-blue-tour[19]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-072",
+      "name": null,
+      "loose_sig": "d1f7f17058792699a48888e632c486c8f0d1674e",
+      "strict_variants": [
+        "90d4bb8433cbfc44e2a9d11f88e7c4200b27de18"
+      ],
+      "reference": {
+        "d50": "N02:P100028000FFFFC0CBU510F2000010f01V3001640396O635ca;P600F200001s00000001U635ca000000000002000002020000R301011O635ca;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[21]"
+      },
+      "format": "N02",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[21]",
+        "white-blue-tour[21]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-073",
+      "name": null,
+      "loose_sig": "d82dbe705fc9594db84db7cf075a2295dbe737f1",
+      "strict_variants": [
+        "8c2ca61a637dd773584815f1b60235e85510883e"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU702F70102000010064V30026405f8E40064000000642064R301011;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[22]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[22]",
+        "white-blue-tour[22]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-074",
+      "name": null,
+      "loose_sig": "1b6331ed9495d4880d81d691ca9002866b8e8207",
+      "strict_variants": [
+        "3bb355b5c4de73983ce69947d59d06f09326d693"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU706F70106000010064V3002640e58R302111O60e58;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[23]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[23]",
+        "white-blue-tour[23]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-075",
+      "name": null,
+      "loose_sig": "593b2ff29250ac60d90553c94c890d8b2203eefa",
+      "strict_variants": [
+        "16dc9fb21885ea34e2dd0d8df9e3ab5d3f4bb854"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU3E40098013000980064O60260R301111;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[25]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[25]",
+        "white-blue-tour[25]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-076",
+      "name": null,
+      "loose_sig": "1ba94c75a949b17b947da8d3f7de6c9638f7957a",
+      "strict_variants": [
+        "cff71aea2ef3104ff196fc6810674ca34e508f11"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU708F601080000V3002640e50R301011;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[26]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[26]",
+        "white-blue-tour[26]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-077",
+      "name": null,
+      "loose_sig": "0824e21840edf06b4bf0d4c91978cfd6a462b257",
+      "strict_variants": [
+        "2617abe709e5877b9a0a0f4ad2d364ee888ecea8"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBT2F210001r0000000001080000S20264U201020000X6ff02000001020000R302011;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[27]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[27]",
+        "white-blue-tour[27]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-078",
+      "name": null,
+      "loose_sig": "adbe53f89386bbc424367de7b9134de9be30dab2",
+      "strict_variants": [
+        "5fc18c7135b280386ec5e96c5fb94642eb83b099"
+      ],
+      "reference": {
+        "d50": "#V:0358c4000000203ec4000000102ec400000000;#I00:N01:P100038000FFFFC0CB8000FFU704R301011F70102000010064V30026401c8O601c8;#I01:N01:P100038000FFFFC0CB8000FFU704R301011F70102000010064V3002640130O601c8;#I02:N01:P100038000FFFFC0CB8000FFU704R301011F70102000010064V3002640098O601c8;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[28]"
+      },
+      "format": "per-ring",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[28]",
+        "white-blue-tour[28]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-079",
+      "name": null,
+      "loose_sig": "c3005516c1cdb3290a5ae57dc64d6130c85ec799",
+      "strict_variants": [
+        "0c54259e791153c5283c5e60910f384aa822087d"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU706F601060000V3002640abcR302011;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[29]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[29]",
+        "white-blue-tour[29]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-080",
+      "name": null,
+      "loose_sig": "04addce38fa9bdaba55fc5e3587fa0b0863d6a93",
+      "strict_variants": [
+        "80a4c34f43a262c047e92ddd612775c7fb34ebe3"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU520F21000200100010V30016402fc;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[30]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[30]",
+        "white-blue-tour[30]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-081",
+      "name": null,
+      "loose_sig": "ae7cf334e94735d9a22d8ab9e44248398df4e9f8",
+      "strict_variants": [
+        "a5a4eed9245e5f9fd7a3c1e6917f9cb69c704697"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU200000003T2F300101S201caO701X60000000002020000R301111;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[32]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[32]",
+        "white-blue-tour[32]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-082",
+      "name": null,
+      "loose_sig": "b342316d1ea4f58ce58ae876e637d8bf31f9f223",
+      "strict_variants": [
+        "d1db9ac9c8f931286d8c769f8f927ce8ed3dcee1"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBU706F70106000010064V30026411e8E40064000000642064R302011;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[33]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[33]",
+        "white-blue-tour[33]"
+      ],
+      "first_seen": "2026-05-28"
+    },
+    {
+      "id": "motion-083",
+      "name": null,
+      "loose_sig": "d977d5cd9bec87e3ac3e477c3ac3e6582d627ded",
+      "strict_variants": [
+        "0d8c3e436b2c4ee03945a87e976a3604cf0ad59e"
+      ],
+      "reference": {
+        "d50": "N01:P100028000FFFFC0CBY3646464640001ca001001ca101;",
+        "palette": [
+          "8000FF",
+          "FFC0CB"
+        ],
+        "source": "purple-pink-tour[34]"
+      },
+      "format": "N01",
+      "recolorable": true,
+      "sources": [
+        "purple-pink-tour[34]",
+        "white-blue-tour[34]"
+      ],
+      "first_seen": "2026-05-28"
+    }
+  ]
+}

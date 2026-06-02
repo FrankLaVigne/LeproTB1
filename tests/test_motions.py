@@ -247,3 +247,97 @@ def test_recolor_rejects_bad_input():
         motions.recolor(N01_SOLID, ["not-hex"])         # bad color
     with pytest.raises(ValueError):
         motions.recolor("U3V3000640000E1;", ["FF0000"])  # no palette blocks
+
+
+# --- catalog merge / rebuild --------------------------------------------------------
+
+
+def make_preset(*d50s, captured="2026-06-02"):
+    return {"captured": captured, "frames": [{"d2": 2, "d50": d} for d in d50s]}
+
+
+def test_merge_new_motions():
+    catalog = {"motions": []}
+    result = motions.merge_preset(catalog, make_preset(N01_SOLID, N02_CHRISTMAS), "test-a")
+    assert result == {"new": 2, "known": 0, "total": 2}
+    assert catalog["motions"][0]["id"] == "motion-001"
+    assert catalog["motions"][1]["id"] == "motion-002"
+    assert catalog["motions"][0]["reference"]["d50"] == N01_SOLID
+    assert catalog["motions"][0]["sources"] == ["test-a[0]"]
+
+
+def test_merge_known_motion_appends_source():
+    catalog = {"motions": []}
+    motions.merge_preset(catalog, make_preset(N02_CHRISTMAS), "first")
+    result = motions.merge_preset(catalog, make_preset(N02_CYBERPUNK_TWIN), "second")
+    # Cross-palette twin: loose sig matches -> known, not new.
+    assert result == {"new": 0, "known": 1, "total": 1}
+    entry = catalog["motions"][0]
+    assert entry["sources"] == ["first[0]", "second[0]"]
+    assert len(entry["strict_variants"]) == 2       # different palette sizes
+    assert entry["reference"]["d50"] == N02_CHRISTMAS  # first-seen wins
+
+
+def test_merge_is_idempotent():
+    catalog = {"motions": []}
+    motions.merge_preset(catalog, make_preset(N01_SOLID), "p")
+    snapshot = json.dumps(catalog, sort_keys=True)
+    motions.merge_preset(catalog, make_preset(N01_SOLID), "p")
+    assert json.dumps(catalog, sort_keys=True) == snapshot
+
+
+def test_merge_preserves_names():
+    catalog = {"motions": []}
+    motions.merge_preset(catalog, make_preset(N01_SOLID), "p")
+    catalog["motions"][0]["name"] = "my favorite"
+    motions.merge_preset(catalog, make_preset(N01_SOLID), "p2")
+    assert catalog["motions"][0]["name"] == "my favorite"
+
+
+def test_merge_catalogs_p4_as_non_recolorable_and_skips_empty():
+    catalog = {"motions": []}
+    result = motions.merge_preset(
+        catalog, make_preset(P4_CYBERPUNK, "", N01_SOLID), "mixed")
+    # P4 frame IS cataloged (detected, non-recolorable); empty d50 is skipped.
+    assert result["total"] == 2
+    p4_entry = next(m for m in catalog["motions"]
+                    if m["reference"]["d50"] == P4_CYBERPUNK)
+    assert p4_entry["recolorable"] is False
+
+
+def test_merge_per_ring_format_recorded():
+    catalog = {"motions": []}
+    motions.merge_preset(catalog, make_preset(PER_RING), "rings")
+    assert catalog["motions"][0]["format"] == "per-ring"
+    assert catalog["motions"][0]["recolorable"] is True
+
+
+def test_rebuild_catalog_real_presets(tmp_path):
+    """Rebuild against the real presets/ directory: deterministic, idempotent,
+    and unifies the known cross-palette twins."""
+    catalog_path = tmp_path / "motions.json"
+    result1 = motions.rebuild_catalog(PRESETS, catalog_path)
+    assert result1["total"] > 0
+    # purple-pink + white-blue must contribute identical motions (35 shared),
+    # so total motions < total frames.
+    assert result1["total"] < 141
+    # Rebuild again: nothing new, same catalog bytes.
+    snapshot = catalog_path.read_text()
+    result2 = motions.rebuild_catalog(PRESETS, catalog_path)
+    assert result2["new"] == 0
+    assert result2["total"] == result1["total"]
+    assert catalog_path.read_text() == snapshot
+
+
+def test_rebuild_skips_catalog_file_itself(tmp_path):
+    """motions.json must never be ingested as a preset, even if it sits in presets_dir."""
+    pdir = tmp_path / "presets"
+    pdir.mkdir()
+    (pdir / "real.json").write_text(json.dumps(make_preset(N01_SOLID)))
+    (pdir / "motions.json").write_text(json.dumps({"motions": []}))
+    result = motions.rebuild_catalog(pdir, pdir / "motions.json")
+    assert result["total"] == 1
+
+
+def test_load_catalog_missing_file(tmp_path):
+    assert motions.load_catalog(tmp_path / "nope.json") == {"motions": []}
