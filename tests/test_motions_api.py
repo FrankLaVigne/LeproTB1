@@ -101,6 +101,9 @@ async def test_play_recolors_and_sends(catalog_file, quiet_lamp, monkeypatch):
 
     async def fake_run_preview(preset, did, client):
         sent_presets.append(preset)
+        # Real _run_preview loops forever; block so the task stays not-done,
+        # exactly like production.
+        await asyncio.Event().wait()
 
     monkeypatch.setattr(workshop, "_run_preview", fake_run_preview)
     resp = await workshop.api_motion_play(
@@ -114,6 +117,14 @@ async def test_play_recolors_and_sends(catalog_file, quiet_lamp, monkeypatch):
     active = workshop._active_mode()
     assert active["mode"] == "motion"
     assert "motion-001" in active["label"]
+    # cleanup: cancel the never-ending preview task
+    task = workshop._preview_task
+    if task is not None:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 async def test_play_without_palette_uses_original(catalog_file, quiet_lamp, monkeypatch):
@@ -121,12 +132,23 @@ async def test_play_without_palette_uses_original(catalog_file, quiet_lamp, monk
 
     async def fake_run_preview(preset, did, client):
         sent_presets.append(preset)
+        # Real _run_preview loops forever; block so the task stays not-done,
+        # exactly like production.
+        await asyncio.Event().wait()
 
     monkeypatch.setattr(workshop, "_run_preview", fake_run_preview)
     resp = await workshop.api_motion_play(_FakeReq({}, id="motion-001"))
     assert _body(resp)["ok"] is True
     await asyncio.sleep(0)
     assert "FFAA00" in sent_presets[0]["payload"]["d50"]    # original colors
+    # cleanup: cancel the never-ending preview task
+    task = workshop._preview_task
+    if task is not None:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 async def test_play_unknown_motion_404(catalog_file, quiet_lamp):
@@ -189,7 +211,9 @@ async def test_capture_save_merges_into_catalog(catalog_file, quiet_lamp, monkey
 async def test_preset_preview_still_labeled_preset(catalog_file, quiet_lamp, monkeypatch):
     """api_preview must keep reporting mode='preset' after the _preview_kind change."""
     async def fake_run_preview(preset, did, client):
-        pass
+        # Real _run_preview loops forever; block so the task stays not-done,
+        # exactly like production.
+        await asyncio.Event().wait()
 
     monkeypatch.setattr(workshop, "_run_preview", fake_run_preview)
     monkeypatch.setattr(workshop, "_load_preset",
@@ -199,6 +223,14 @@ async def test_preset_preview_still_labeled_preset(catalog_file, quiet_lamp, mon
     assert _body(resp)["ok"] is True
     active = workshop._active_mode()
     assert active["mode"] == "preset"
+    # cleanup: cancel the never-ending preview task
+    task = workshop._preview_task
+    if task is not None:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 async def test_route_registration():

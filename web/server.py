@@ -1918,7 +1918,7 @@ def _active_mode() -> dict:
                 syms.append(r["symbol"])
         label = "\U0001F4C8 Ticker — " + ", ".join(syms) if syms else "\U0001F4C8 Ticker"
         return {"mode": "ticker", "label": label}
-    if _preview_task is not None:
+    if _preview_task is not None and not _preview_task.done():
         nm = _preview_name or "?"
         if _preview_kind == "motion":
             return {"mode": "motion", "label": f"\U0001F3A8 Motion — {nm}"}
