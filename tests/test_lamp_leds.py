@@ -45,21 +45,40 @@ async def test_lamp_leds_segmented_n01(quiet_sessions, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_lamp_leds_rgb_mode(quiet_sessions, monkeypatch):
-    fields = {"d1": 1, "d2": 1, "d5": "000003E803E8"}
+    fields = {"d1": 1, "d2": 1, "d5": "000003E803E8", "d3": 600}
     monkeypatch.setattr(workshop, "_client", _FakeClient(fields))
     body = _body(await workshop.api_lamp_leds(None))
     assert body["lamp_mode"] == "rgb"
     assert body["leds"] == ["FF0000"] * 196
-    assert body["brightness_pct"] is None    # no d52 reported
+    assert body["brightness_pct"] == 60    # d3=600 → 60%
+
+
+@pytest.mark.asyncio
+async def test_lamp_leds_rgb_mode_without_d3_has_no_brightness(quiet_sessions, monkeypatch):
+    fields = {"d1": 1, "d2": 1, "d5": "000003E803E8"}
+    monkeypatch.setattr(workshop, "_client", _FakeClient(fields))
+    body = _body(await workshop.api_lamp_leds(None))
+    assert body["lamp_mode"] == "rgb"
+    assert body["brightness_pct"] is None    # no d3 reported
 
 
 @pytest.mark.asyncio
 async def test_lamp_leds_white_mode(quiet_sessions, monkeypatch):
-    fields = {"d1": 1, "d2": 0, "d4": 1000}
+    fields = {"d1": 1, "d2": 0, "d4": 1000, "d3": 450}
     monkeypatch.setattr(workshop, "_client", _FakeClient(fields))
     body = _body(await workshop.api_lamp_leds(None))
     assert body["lamp_mode"] == "white"
     assert body["leds"] == ["EBF2FF"] * 196
+    assert body["brightness_pct"] == 45    # d3=450 → 45%
+
+
+@pytest.mark.asyncio
+async def test_lamp_leds_segmented_ignores_d3(quiet_sessions, monkeypatch):
+    fields = {"d1": 1, "d2": 2, "d52": 800, "d3": 100, "d50": SOLID_ORANGE}
+    monkeypatch.setattr(workshop, "_client", _FakeClient(fields))
+    body = _body(await workshop.api_lamp_leds(None))
+    assert body["lamp_mode"] == "segmented"
+    assert body["brightness_pct"] == 80    # d52=800 wins; d3 ignored in segmented mode
 
 
 @pytest.mark.asyncio

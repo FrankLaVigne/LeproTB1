@@ -1822,10 +1822,13 @@ async def api_lamp_leds(_req):
         for f in _client.state.values():
             fields = f
             break    # the workshop only ever has one lamp
-    d52 = fields.get("d52")
+    # Brightness field depends on mode: segmented (d2=2) reports d52;
+    # white/RGB modes report d3 (the TB1 is a B-series device).
+    raw_brightness = fields.get("d52") if fields.get("d2") == 2 else fields.get("d3")
     return web.json_response({
         "power": fields.get("d1") == 1,
-        "brightness_pct": round(d52 / 10) if isinstance(d52, (int, float)) else None,
+        "brightness_pct": (round(raw_brightness / 10)
+                           if isinstance(raw_brightness, (int, float)) else None),
         "lamp_mode": {0: "white", 1: "rgb", 2: "segmented", 3: "effect"}.get(fields.get("d2")),
         "active": _active_mode(),
         "leds": lampview.fields_to_leds(fields),
