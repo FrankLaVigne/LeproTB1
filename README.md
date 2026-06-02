@@ -82,6 +82,19 @@ The visualizer decodes the lamp's reported `d50` (our N01 format), RGB mode
 (`d5`), and white mode (`d4`). Official-app animations (N02/N03 formats) show
 as dark rings — nothing decodes those yet.
 
+### Motion library
+
+Every unique animation the Lepro app can produce, cataloged by palette-independent
+signature and playable in **any** palette — open the workshop's **Motions** tab.
+
+```bash
+.venv/bin/python -m web.motions     # (re)build motions.json from presets/
+```
+
+The catalog (`motions.json`) is a database: motion names you assign in the UI are
+never overwritten by rebuilds. Capturing new animations from the Animations tab
+automatically merges new motions into the catalog.
+
 ## MCP server
 
 Expose the lamp to AI agents (OpenClaw, Claude Desktop/Code, any MCP client) over
