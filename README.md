@@ -39,7 +39,7 @@ cp config.json.example config.json   # then edit with your Lepro account
 
 ```
 lepro/        package — the cloud client (LeproClient) + utilities
-cli/          terminal scripts: main, stock_lamp, play_preset
+cli/          terminal scripts: main, stock_lamp, play_preset, tui (Textual cockpit)
 web/          aiohttp UI: server (cockpit), ticker, clock, legacy, static/
 mcphost/      FastMCP host (named mcphost/ so it doesn't shadow PyPI's mcp)
 presets/      preset library (data)
@@ -63,6 +63,24 @@ Every runnable script is a Python module: launch with `python -m <pkg>.<mod>`.
 ```
 
 Add `--did <id>` to target a specific light (default: the first one discovered).
+
+### Lamp TUI
+
+A Textual terminal cockpit: live ring visualizer + power / brightness / fill /
+stop, driven through the workshop server's HTTP API (start `web.server` first).
+
+```bash
+.venv/bin/python -m web.server     # the workshop (terminal 1)
+.venv/bin/python -m cli.tui        # the TUI (terminal 2, same machine)
+.venv/bin/python -m cli.tui --server http://192.168.1.50:8081   # or remote
+```
+
+Keys: `p` power · `↑`/`↓` brightness · `1`-`8` fill color · `s` stop ·
+`v` rings/strips view · `d` raw d-fields · `r` refresh · `q` quit.
+
+The visualizer decodes the lamp's reported `d50` (our N01 format), RGB mode
+(`d5`), and white mode (`d4`). Official-app animations (N02/N03 formats) show
+as dark rings — nothing decodes those yet.
 
 ## MCP server
 
