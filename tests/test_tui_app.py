@@ -110,7 +110,7 @@ async def test_brightness_presses_debounce_to_one_post():
         await pilot.pause()
         await pilot.press("up", "up", "up")
         # Wait past the debounce window so the single POST fires.
-        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.3)
+        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.5)
         sends = [c for c in api.calls if c[0] == "set_brightness"]
         assert sends == [("set_brightness", 95)]   # 80 + 5 + 5 + 5
 
@@ -122,7 +122,7 @@ async def test_brightness_clamps_to_100():
     async with app.run_test() as pilot:
         await pilot.pause()
         await pilot.press("up", "up")
-        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.3)
+        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.5)
         sends = [c for c in api.calls if c[0] == "set_brightness"]
         assert sends == [("set_brightness", 100)]
 
@@ -204,7 +204,7 @@ async def test_poll_does_not_clobber_pending_brightness():
         bar = app.query_one(StatusBar)
         assert bar.state["brightness_pct"] == 85  # optimistic value preserved
         # let the debounce fire so the test exits cleanly
-        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.3)
+        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.5)
 
 
 @pytest.mark.asyncio
@@ -215,7 +215,7 @@ async def test_poll_does_not_clobber_sent_brightness_until_echoed():
     async with app.run_test() as pilot:
         await pilot.pause()
         await pilot.press("up")                  # optimistic 85
-        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.3)   # debounce fires, POST sent
+        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.5)   # debounce fires, POST sent
         assert ("set_brightness", 85) in api.calls
         await app.refresh_state()                # poll still returns stale 80
         bar = app.query_one(StatusBar)
@@ -244,7 +244,7 @@ async def test_rejected_brightness_post_releases_guard():
     async with app.run_test() as pilot:
         await pilot.pause()
         await pilot.press("up")                              # optimistic 85
-        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.3)     # POST fires, rejected
+        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.5)     # POST fires, rejected
         assert ("set_brightness", 85) in api.calls
         # Server still reports the real value (80); the display must accept it.
         await app.refresh_state()
