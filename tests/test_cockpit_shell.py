@@ -152,3 +152,12 @@ def test_render_shell_motions_tab_present_on_other_pages():
     # Even when not active, the Motions link must appear on every page.
     out = workshop._render_shell(active="presets", panel_html="", title="Presets")
     assert 'href="/motions"' in out
+
+
+@pytest.mark.asyncio
+async def test_motions_page_renders_real_panel():
+    resp = await workshop.index_motions(None)
+    text = resp.text if hasattr(resp, "text") and isinstance(resp.text, str) else resp.body.decode()
+    assert "motion-grid" in text          # the real panel's grid container
+    assert "Motions UI coming soon" not in text    # placeholder is gone
+    assert "motion-rebuild" in text       # toolbar button present

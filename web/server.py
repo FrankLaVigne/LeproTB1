@@ -433,10 +433,8 @@ async def api_motion_play(req):
 
 
 async def index_motions(_req):
-    """Motions tab page. Placeholder panel until the UI task lands."""
-    return web.Response(
-        text=_render_shell("motions", "<div>Motions UI coming soon</div>", "Motions"),
-        content_type="text/html")
+    return web.Response(text=_render_shell("motions", _PANEL_MOTIONS, "Motions"),
+                        content_type="text/html")
 
 
 # --- Animations tab — see docs/superpowers/specs/2026-06-01-animations-tab-design.md
@@ -607,7 +605,7 @@ async def api_captures_save(req):
 _PANEL_ANIMATIONS = """
 <div class="capture-bar">
   <div class="capture-counter">
-    <strong id="capture-count">—</strong> unique animations / ~72 target
+    <strong id="capture-count">—</strong> unique motions cataloged
   </div>
   <button id="capture-btn" class="capture-action">🎥 Capture</button>
 </div>
@@ -637,7 +635,6 @@ const saveForm = $('#capture-saveform');
 const nameInput = $('#capture-name');
 const notice = $('#capture-notice');
 
-const TARGET_TOTAL = 72;
 let pollTimer = null;
 
 function setStatus(msg, isError) {
@@ -756,7 +753,12 @@ async function loadAnimations() {
     const j = await r.json();
     list.innerHTML = '';
     const items = j.animations || [];
-    captureCount.textContent = items.length;
+    // The counter shows the frame-level motion catalog count (the real
+    // dedup), not the preset-group count.
+    try {
+      const mj = await (await fetch('/api/motions')).json();
+      captureCount.textContent = mj.total;
+    } catch { captureCount.textContent = items.length; }
     if (items.length === 0) {
       empty.style.display = 'block';
       return;
@@ -822,11 +824,14 @@ async function submitSave() {
   const j = await postJSON('/api/captures/save', {name});
   if (j.ok === false) { setNotice('error: ' + j.error, 'err'); return; }
   saveForm.style.display = 'none';
+  const motionsInfo = j.motions
+    ? ` · ${j.motions.new} new motion${j.motions.new === 1 ? '' : 's'} (catalog: ${j.motions.catalog_total})`
+    : '';
   if (j.matched_animation) {
     const m = j.matched_animation;
-    setNotice(`Saved as ${name} → matches ${m.name} (now ${m.variant_count} variants)`, 'matched');
+    setNotice(`Saved as ${name} → matches ${m.name} (now ${m.variant_count} variants)${motionsInfo}`, 'matched');
   } else {
-    setNotice(`Saved as ${name} → new animation`, 'ok');
+    setNotice(`Saved as ${name} → new animation${motionsInfo}`, 'ok');
   }
   await loadAnimations();
 }
@@ -869,6 +874,193 @@ loadAnimations();
 // On page mount, check if a capture is already in flight (so reloading
 // the tab while capturing doesn't lose track of it).
 pollCaptureState();
+</script>
+"""
+
+_PANEL_MOTIONS = """
+<style>
+  /* Feature-specific styles for the Motions panel. Generic chrome lives in
+     /static/cockpit.css. Classes prefixed .motion- to avoid collisions. */
+  .motion-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+                    padding: 10px 0; border-bottom: 1px solid #2a2a3a; }
+  .motion-toolbar .counts { color: var(--text-dim, #999); font-size: 13px;
+                            margin-left: auto; }
+  .motion-palette { display: flex; align-items: center; gap: 6px; }
+  .motion-palette input[type=color] { width: 36px; height: 28px; border: none;
+                                      background: none; cursor: pointer; padding: 0; }
+  .motion-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+                 gap: 10px; padding-top: 12px; }
+  .motion-card { border: 1px solid #2a2a3a; border-radius: 8px;
+                 padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .motion-card.playing { border-color: var(--accent, #6cf);
+                         box-shadow: 0 0 6px var(--accent, #6cf); }
+  .motion-card .mname { font-weight: 600; cursor: pointer; }
+  .motion-card .mname input { width: 100%; }
+  .motion-card .mmeta { font-size: 11px; color: var(--text-dim, #999); }
+  .motion-card .mswatches span { display: inline-block; width: 14px; height: 14px;
+                                 border-radius: 3px; margin-right: 3px;
+                                 vertical-align: middle; }
+  .motion-card .badge { display: inline-block; font-size: 10px; padding: 1px 6px;
+                        border-radius: 8px; background: #2a2a3a; margin-left: 6px; }
+  .motion-status { padding: 8px 0; font-size: 13px; min-height: 20px; }
+</style>
+
+<div class="motion-toolbar">
+  <div class="motion-palette" id="motion-palette">
+    <span style="font-size:12px;color:var(--text-dim,#999)">PALETTE</span>
+    <input type="color" value="#ff0000">
+    <input type="color" value="#0080ff">
+    <button id="palette-add">+</button>
+    <button id="palette-remove">&minus;</button>
+  </div>
+  <button id="motion-next-unnamed">&#x25B6; next unnamed</button>
+  <button id="motion-rebuild">&#x27F3; Rebuild catalog</button>
+  <div class="counts" id="motion-counts">&mdash;</div>
+</div>
+<div class="motion-status" id="motion-status"></div>
+<div class="motion-grid" id="motion-grid"></div>
+<div id="motion-empty" style="display:none">
+  No motions cataloged yet. Hit &#x27F3; Rebuild catalog to scan presets/, or capture
+  animations from the Animations tab.
+</div>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const grid = $('#motion-grid');
+const counts = $('#motion-counts');
+const statusEl = $('#motion-status');
+const paletteBar = $('#motion-palette');
+const emptyEl = $('#motion-empty');
+
+let playingId = null;
+let motionsCache = [];
+
+function setStatus(msg, isError) {
+  statusEl.textContent = msg || '';
+  statusEl.style.color = isError ? 'var(--danger, #f66)' : '';
+}
+
+async function postJSON(path, body) {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body || {}),
+  });
+  try {
+    return await r.json();
+  } catch {
+    // Mutex conflicts (409) and other aiohttp error pages aren't JSON.
+    return {ok: false, error: `HTTP ${r.status}`};
+  }
+}
+
+function currentPalette() {
+  return Array.from(paletteBar.querySelectorAll('input[type=color]'))
+    .map(i => i.value.replace('#', '').toUpperCase());
+}
+
+$('#palette-add').addEventListener('click', () => {
+  const inputs = paletteBar.querySelectorAll('input[type=color]');
+  if (inputs.length >= 9) return;
+  const el = document.createElement('input');
+  el.type = 'color';
+  el.value = '#ffffff';
+  inputs[inputs.length - 1].after(el);
+});
+
+$('#palette-remove').addEventListener('click', () => {
+  const inputs = paletteBar.querySelectorAll('input[type=color]');
+  if (inputs.length > 1) inputs[inputs.length - 1].remove();
+});
+
+function swatches(palette) {
+  return (palette || []).map(c => `<span style="background:#${c}"></span>`).join('');
+}
+
+function buildCard(m) {
+  const card = document.createElement('div');
+  card.className = 'motion-card' + (m.id === playingId ? ' playing' : '');
+  card.dataset.id = m.id;
+  const displayName = m.name || m.id;
+  const recolorBadge = m.recolorable ? '' : '<span class="badge">original colors only</span>';
+  const nSources = m.sources.length;
+  card.innerHTML = `
+    <div class="mname" title="click to rename">${displayName}${recolorBadge}</div>
+    <div class="mmeta">${m.format} &middot; ${m.reference.palette.length} colors &middot;
+         seen in ${nSources} capture${nSources === 1 ? '' : 's'}</div>
+    <div class="mswatches">${swatches(m.reference.palette)}</div>
+    <div><button data-action="play">&#x25B6; Play</button></div>
+  `;
+  card.querySelector('[data-action="play"]').addEventListener('click', () => playMotion(m));
+  card.querySelector('.mname').addEventListener('click', () => startRename(card, m));
+  return card;
+}
+
+function startRename(card, m) {
+  const nameEl = card.querySelector('.mname');
+  if (nameEl.querySelector('input')) return;    // already editing
+  const current = m.name || '';
+  nameEl.innerHTML = `<input type="text" value="${current}" placeholder="${m.id}">`;
+  const input = nameEl.querySelector('input');
+  input.focus();
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      const name = input.value.trim();
+      if (!name) { loadMotions(); return; }
+      const j = await postJSON(`/api/motions/${m.id}/rename`, {name});
+      setStatus(j.ok === false ? ('error: ' + j.error) : `named: ${name}`, j.ok === false);
+      loadMotions();
+    } else if (e.key === 'Escape') {
+      loadMotions();
+    }
+  });
+  input.addEventListener('blur', () => loadMotions());
+}
+
+async function playMotion(m) {
+  const body = m.recolorable ? {palette: currentPalette()} : {};
+  const j = await postJSON(`/api/motions/${m.id}/play`, body);
+  if (j.ok === false) { setStatus('error: ' + j.error, true); return; }
+  playingId = m.id;
+  setStatus(`playing ${m.name || m.id}…`);
+  renderGrid();
+}
+
+function renderGrid() {
+  grid.innerHTML = '';
+  emptyEl.style.display = motionsCache.length ? 'none' : 'block';
+  for (const m of motionsCache) grid.appendChild(buildCard(m));
+}
+
+async function loadMotions() {
+  try {
+    const r = await fetch('/api/motions');
+    const j = await r.json();
+    motionsCache = j.motions || [];
+    counts.textContent = `${j.total} motions · ${j.named} named`;
+    renderGrid();
+  } catch (e) {
+    setStatus('failed to load motions: ' + e.message, true);
+  }
+}
+
+$('#motion-rebuild').addEventListener('click', async () => {
+  setStatus('rebuilding…');
+  const j = await postJSON('/api/motions/rebuild', {});
+  if (j.ok === false) { setStatus('error: ' + j.error, true); return; }
+  setStatus(`catalog rebuilt: ${j.total} motions (${j.new} new)`);
+  loadMotions();
+});
+
+$('#motion-next-unnamed').addEventListener('click', async () => {
+  const next = motionsCache.find(m => !m.name);
+  if (!next) { setStatus('every motion is named \N{PARTY POPPER}'); return; }
+  await playMotion(next);
+  const card = grid.querySelector(`[data-id="${next.id}"]`);
+  if (card) startRename(card, next);
+});
+
+loadMotions();
 </script>
 """
 
