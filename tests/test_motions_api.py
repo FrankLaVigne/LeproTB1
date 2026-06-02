@@ -242,3 +242,33 @@ async def test_route_registration():
     assert ("POST", "/api/motions/{id}/play") in routes
     assert ("POST", "/api/motions/{id}/rename") in routes
     assert ("GET", "/motions") in routes
+
+
+async def test_capture_save_succeeds_even_if_catalog_merge_fails(
+        catalog_file, quiet_lamp, monkeypatch, tmp_path):
+    """A catalog write failure must not fail the capture save — the preset file
+    is the artifact that matters."""
+    presets_dir = tmp_path / "presets"
+    presets_dir.mkdir()
+    monkeypatch.setattr(workshop, "_PRESETS_DIR", presets_dir)
+    monkeypatch.setattr(workshop, "_PROJECT_ROOT", tmp_path)
+
+    class _DoneSession:
+        running = False
+        frames = ["N03:P10001ABCDEFF21000100C4U3V3030640000R301111;"]
+
+        async def stop(self):
+            pass
+
+    monkeypatch.setattr(workshop, "_capture_session", _DoneSession())
+
+    def broken_save(catalog, path):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(workshop._motions_mod, "save_catalog", broken_save)
+    resp = await workshop.api_captures_save(_FakeReq({"name": "survives-merge-failure"}))
+    body = _body(resp)
+    assert body["ok"] is True                         # save still succeeded
+    assert body["motions"] is None                    # merge result degraded to None
+    assert (presets_dir / "survives-merge-failure.json").exists()    # preset on disk
+    assert workshop._capture_session is None          # session not stranded

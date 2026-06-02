@@ -572,13 +572,19 @@ async def api_captures_save(req):
                 status=400)
         preset = _captures_mod.build_capture_preset(frames, name)
         out_path.write_text(json.dumps(preset, indent=2) + "\n")
-        # Merge the new capture's frames into the motion catalog (the Motions
-        # tab's "N new motions discovered" feedback).
-        async with _motions_lock:
-            motion_catalog = _motions_mod.load_catalog(_MOTIONS_CATALOG_PATH)
-            motion_result = _motions_mod.merge_preset(motion_catalog, preset, name)
-            _motions_mod.save_catalog(motion_catalog, _MOTIONS_CATALOG_PATH)
         _capture_session = None
+        # Merge the new capture's frames into the motion catalog (the Motions
+        # tab's "N new motions discovered" feedback). A catalog hiccup must
+        # never fail an otherwise-successful capture save — the preset file on
+        # disk is the artifact that matters; the catalog can be rebuilt.
+        try:
+            async with _motions_lock:
+                motion_catalog = _motions_mod.load_catalog(_MOTIONS_CATALOG_PATH)
+                motion_result = _motions_mod.merge_preset(motion_catalog, preset, name)
+                _motions_mod.save_catalog(motion_catalog, _MOTIONS_CATALOG_PATH)
+        except OSError as e:
+            _LOG.warning("capture saved but motion-catalog merge failed: %s", e)
+            motion_result = None
         # Look up whether the new preset matches an existing animation group.
         matched = None
         for anim in _grouped_animations():
@@ -593,9 +599,10 @@ async def api_captures_save(req):
             "ok": True,
             "path": str(out_path.relative_to(_PROJECT_ROOT)),
             "matched_animation": matched,
-            "motions": {"new": motion_result["new"],
-                        "known": motion_result["known"],
-                        "catalog_total": motion_result["total"]},
+            "motions": (None if motion_result is None else
+                        {"new": motion_result["new"],
+                         "known": motion_result["known"],
+                         "catalog_total": motion_result["total"]}),
         })
     except (KeyError, ValueError, TypeError) as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
@@ -882,32 +889,32 @@ _PANEL_MOTIONS = """
   /* Feature-specific styles for the Motions panel. Generic chrome lives in
      /static/cockpit.css. Classes prefixed .motion- to avoid collisions. */
   .motion-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-                    padding: 10px 0; border-bottom: 1px solid #2a2a3a; }
-  .motion-toolbar .counts { color: var(--text-dim, #999); font-size: 13px;
+                    padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .motion-toolbar .counts { color: var(--text-dim); font-size: 13px;
                             margin-left: auto; }
   .motion-palette { display: flex; align-items: center; gap: 6px; }
   .motion-palette input[type=color] { width: 36px; height: 28px; border: none;
                                       background: none; cursor: pointer; padding: 0; }
   .motion-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
                  gap: 10px; padding-top: 12px; }
-  .motion-card { border: 1px solid #2a2a3a; border-radius: 8px;
+  .motion-card { border: 1px solid var(--border); border-radius: 8px;
                  padding: 10px; display: flex; flex-direction: column; gap: 6px; }
-  .motion-card.playing { border-color: var(--accent, #6cf);
-                         box-shadow: 0 0 6px var(--accent, #6cf); }
+  .motion-card.playing { border-color: var(--accent);
+                         box-shadow: 0 0 6px var(--accent); }
   .motion-card .mname { font-weight: 600; cursor: pointer; }
   .motion-card .mname input { width: 100%; }
-  .motion-card .mmeta { font-size: 11px; color: var(--text-dim, #999); }
+  .motion-card .mmeta { font-size: 11px; color: var(--text-dim); }
   .motion-card .mswatches span { display: inline-block; width: 14px; height: 14px;
                                  border-radius: 3px; margin-right: 3px;
                                  vertical-align: middle; }
   .motion-card .badge { display: inline-block; font-size: 10px; padding: 1px 6px;
-                        border-radius: 8px; background: #2a2a3a; margin-left: 6px; }
+                        border-radius: 8px; background: var(--panel-hi); margin-left: 6px; }
   .motion-status { padding: 8px 0; font-size: 13px; min-height: 20px; }
 </style>
 
 <div class="motion-toolbar">
   <div class="motion-palette" id="motion-palette">
-    <span style="font-size:12px;color:var(--text-dim,#999)">PALETTE</span>
+    <span style="font-size:12px;color:var(--text-dim)">PALETTE</span>
     <input type="color" value="#ff0000">
     <input type="color" value="#0080ff">
     <button id="palette-add">+</button>
@@ -1054,7 +1061,7 @@ $('#motion-rebuild').addEventListener('click', async () => {
 
 $('#motion-next-unnamed').addEventListener('click', async () => {
   const next = motionsCache.find(m => !m.name);
-  if (!next) { setStatus('every motion is named \N{PARTY POPPER}'); return; }
+  if (!next) { setStatus('every motion is named 🎉'); return; }
   await playMotion(next);
   const card = grid.querySelector(`[data-id="${next.id}"]`);
   if (card) startRename(card, next);
