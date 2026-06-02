@@ -293,6 +293,7 @@ async def test_api_captures_save_writes_preset_and_reports_matched_animation(tmp
     monkeypatch.setattr(workshop, "_PRESETS_DIR", tmp_path)
     monkeypatch.setattr(workshop, "_PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(workshop, "_ANIMATIONS_OVERRIDES_PATH", tmp_path / "animations.json")
+    monkeypatch.setattr(workshop, "_MOTIONS_CATALOG_PATH", tmp_path / "motions.json")
 
     # Pre-populate an existing preset with a known d50 so the new save
     # fingerprints as a match.

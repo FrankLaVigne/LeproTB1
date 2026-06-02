@@ -342,6 +342,115 @@ _HERE = Path(__file__).resolve().parent
 _PROJECT_ROOT = _HERE.parent  # repo root, parent of the web/ package
 _PRESETS_DIR = _PROJECT_ROOT / "presets"
 
+# --- Motions tab — see docs/superpowers/specs/2026-06-02-motion-library-design.md
+from web import motions as _motions_mod
+
+_MOTIONS_CATALOG_PATH = _PROJECT_ROOT / "motions.json"
+
+# Serializes catalog load-modify-save sequences so concurrent mutations
+# (rename vs capture-save merge vs rebuild) can't lose updates.
+_motions_lock = asyncio.Lock()
+
+# What kind of preview _preview_task is running: "preset" (api_preview) or
+# "motion" (api_motion_play). Read by _active_mode() for the banner label.
+_preview_kind: str = "preset"
+
+
+def _load_motion_catalog() -> dict:
+    return _motions_mod.load_catalog(_MOTIONS_CATALOG_PATH)
+
+
+def _find_motion(catalog: dict, motion_id: str):
+    return next((m for m in catalog["motions"] if m["id"] == motion_id), None)
+
+
+async def api_motions(_req):
+    """The motion catalog + counts, for the Motions tab."""
+    catalog = _load_motion_catalog()
+    entries = catalog["motions"]
+    named = sum(1 for m in entries if m.get("name"))
+    return web.json_response(
+        {"motions": entries, "total": len(entries), "named": named})
+
+
+async def api_motions_rebuild(_req):
+    """Rescan presets/ and merge new frames into the catalog."""
+    async with _motions_lock:
+        result = _motions_mod.rebuild_catalog(_PRESETS_DIR, _MOTIONS_CATALOG_PATH)
+    return web.json_response({"ok": True, **result})
+
+
+async def api_motion_rename(req):
+    """Set a motion's display name."""
+    mid = req.match_info["id"]
+    try:
+        body = await req.json()
+        name = str(body.get("name") or "").strip()
+        if not name:
+            return web.json_response({"ok": False, "error": "name required"}, status=400)
+        async with _motions_lock:
+            catalog = _load_motion_catalog()
+            entry = _find_motion(catalog, mid)
+            if entry is None:
+                return web.json_response(
+                    {"ok": False, "error": f"motion {mid!r} not found"}, status=404)
+            entry["name"] = name
+            _motions_mod.save_catalog(catalog, _MOTIONS_CATALOG_PATH)
+        return web.json_response({"ok": True})
+    except (ValueError, KeyError, TypeError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+async def api_motion_play(req):
+    """Recolor a motion with the request palette and run it on the lamp.
+
+    Reuses the preset-preview task slot, so the same mutex rules apply
+    (409 while capture/clock/ticker runs; /api/stop stops it).
+    """
+    global _preview_task, _preview_name, _preview_kind
+    mid = req.match_info["id"]
+    try:
+        body = await req.json()
+        _check_ticker_mutex()
+        _check_clock_mutex()
+        _check_capture_mutex()
+        catalog = _load_motion_catalog()
+        entry = _find_motion(catalog, mid)
+        if entry is None:
+            return web.json_response(
+                {"ok": False, "error": f"motion {mid!r} not found"}, status=404)
+        d50 = entry["reference"]["d50"]
+        palette = [c for c in (body.get("palette") or []) if c]
+        if palette and entry.get("recolorable", True):
+            d50 = _motions_mod.recolor(d50, palette)
+        # A single-payload pseudo-preset drives _run_preview exactly like a
+        # one-frame preset preview.
+        pseudo = {"name": entry.get("name") or entry["id"],
+                  "payload": {"d1": 1, "d2": 2, "d50": d50}}
+        did = _client._dev(None).did
+        if _preview_task and not _preview_task.done():
+            _preview_task.cancel()
+            try:
+                await _preview_task
+            except asyncio.CancelledError:
+                pass
+        _preview_task = asyncio.create_task(_run_preview(pseudo, did, _client))
+        _preview_name = entry.get("name") or entry["id"]
+        _preview_kind = "motion"
+        return web.json_response({"ok": True})
+    except web.HTTPConflict:
+        raise
+    except (LeproError, ValueError, KeyError, TypeError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+async def index_motions(_req):
+    """Motions tab page. Placeholder panel until the UI task lands."""
+    return web.Response(
+        text=_render_shell("motions", "<div>Motions UI coming soon</div>", "Motions"),
+        content_type="text/html")
+
+
 # --- Animations tab — see docs/superpowers/specs/2026-06-01-animations-tab-design.md
 from web import animations as _animations_mod
 from web import captures as _captures_mod
@@ -477,6 +586,12 @@ async def api_captures_save(req):
                 status=400)
         preset = _captures_mod.build_capture_preset(frames, name)
         out_path.write_text(json.dumps(preset, indent=2) + "\n")
+        # Merge the new capture's frames into the motion catalog (the Motions
+        # tab's "N new motions discovered" feedback).
+        async with _motions_lock:
+            motion_catalog = _motions_mod.load_catalog(_MOTIONS_CATALOG_PATH)
+            motion_result = _motions_mod.merge_preset(motion_catalog, preset, name)
+            _motions_mod.save_catalog(motion_catalog, _MOTIONS_CATALOG_PATH)
         _capture_session = None
         # Look up whether the new preset matches an existing animation group.
         matched = None
@@ -492,6 +607,9 @@ async def api_captures_save(req):
             "ok": True,
             "path": str(out_path.relative_to(_PROJECT_ROOT)),
             "matched_animation": matched,
+            "motions": {"new": motion_result["new"],
+                        "known": motion_result["known"],
+                        "catalog_total": motion_result["total"]},
         })
     except (KeyError, ValueError, TypeError) as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
@@ -821,6 +939,7 @@ _SHELL_TEMPLATE = """<!doctype html>
       <a href="/ticker" {cls_ticker}>&#x1F4C8; Ticker</a>
       <a href="/clock" {cls_clock}>&#x23F0; Clock</a>
       <a href="/animations" {cls_animations}>&#x1F39E;&#xFE0F; Animations</a>
+      <a href="/motions" {cls_motions}>&#x1F300; Motions</a>
     </nav>
     <section class="panel">
 {panel}
@@ -846,6 +965,7 @@ def _render_shell(active: str, panel_html: str, title: str) -> str:
         "ticker": "",
         "clock": "",
         "animations": "",
+        "motions": "",
     }
     if active not in active_classes:
         raise ValueError(f"unknown tab {active!r}; expected one of {list(active_classes)}")
@@ -858,6 +978,7 @@ def _render_shell(active: str, panel_html: str, title: str) -> str:
         cls_ticker=active_classes["ticker"],
         cls_clock=active_classes["clock"],
         cls_animations=active_classes["animations"],
+        cls_motions=active_classes["motions"],
     )
 
 
@@ -1499,7 +1620,7 @@ async def api_power(req):
 
 
 async def api_preview(req):
-    global _preview_task, _preview_name
+    global _preview_task, _preview_name, _preview_kind
     try:
         body = await req.json()
         _check_ticker_mutex()
@@ -1519,6 +1640,7 @@ async def api_preview(req):
                 pass
         _preview_task = asyncio.create_task(_run_preview(recolored, did, _client))
         _preview_name = recolored.get("name") or body.get("base_name") or "(unnamed)"
+        _preview_kind = "preset"
         return web.json_response({"ok": True})
     except web.HTTPConflict:
         raise
@@ -1796,8 +1918,10 @@ def _active_mode() -> dict:
                 syms.append(r["symbol"])
         label = "\U0001F4C8 Ticker — " + ", ".join(syms) if syms else "\U0001F4C8 Ticker"
         return {"mode": "ticker", "label": label}
-    if _preview_task is not None and not _preview_task.done():
+    if _preview_task is not None:
         nm = _preview_name or "?"
+        if _preview_kind == "motion":
+            return {"mode": "motion", "label": f"\U0001F3A8 Motion — {nm}"}
         return {"mode": "preset", "label": f"\U0001F3A8 Preset — {nm}"}
     # 3. On but nothing actively driving.
     return {"mode": "idle", "label": "✨ Idle"}
@@ -2491,6 +2615,11 @@ def build_app() -> web.Application:
         web.get("/api/captures/state", api_captures_state),
         web.post("/api/captures/cancel", api_captures_cancel),
         web.post("/api/captures/save", api_captures_save),
+        web.get("/motions", index_motions),
+        web.get("/api/motions", api_motions),
+        web.post("/api/motions/rebuild", api_motions_rebuild),
+        web.post(r"/api/motions/{id}/play", api_motion_play),
+        web.post(r"/api/motions/{id}/rename", api_motion_rename),
     ])
     # Static assets — currently just lamp-utils.js shared by /diy and /state.
     app.router.add_static("/static", _HERE / "static")

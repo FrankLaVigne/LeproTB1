@@ -140,3 +140,15 @@ def test_render_shell_animations_tab_present_on_other_pages():
     # Even when not active, the Animations link must appear on every page.
     out = workshop._render_shell(active="presets", panel_html="", title="Presets")
     assert 'href="/animations"' in out
+
+
+def test_render_shell_links_to_motions_tab():
+    out = workshop._render_shell(active="motions", panel_html="", title="Motions")
+    assert 'href="/motions"' in out
+    assert 'href="/motions" class="active"' in out
+
+
+def test_render_shell_motions_tab_present_on_other_pages():
+    # Even when not active, the Motions link must appear on every page.
+    out = workshop._render_shell(active="presets", panel_html="", title="Presets")
+    assert 'href="/motions"' in out
