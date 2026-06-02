@@ -23,6 +23,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.reactive import reactive
+from textual.css.query import NoMatches
 from textual.widgets import Footer, Static
 
 from cli import tui_render
@@ -231,7 +232,12 @@ class LeproTUI(App):
     # --- polling ---------------------------------------------------------------
 
     async def refresh_state(self) -> None:
-        bar = self.query_one(StatusBar)
+        try:
+            bar = self.query_one(StatusBar)
+        except NoMatches:
+            # The app is tearing down — poll/burst timers can outlive widget
+            # unmount. Nothing to update.
+            return
         try:
             state = await self.api.get_leds()
         except Exception:
