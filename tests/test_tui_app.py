@@ -34,7 +34,7 @@ class StubApi:
 
     async def get_leds(self):
         self.calls.append(("get_leds",))
-        return self.state
+        return dict(self.state)  # copy so optimistic lamp_state mutations don't alias the stub
 
     async def set_power(self, on):
         self.calls.append(("set_power", on))
@@ -190,3 +190,41 @@ async def test_api_closed_on_exit():
     async with LeproTUI(api=api).run_test() as pilot:
         await pilot.pause()
     assert ("close",) in api.calls
+
+
+@pytest.mark.asyncio
+async def test_poll_does_not_clobber_pending_brightness():
+    """While a debounced brightness send is pending, polls keep the optimistic value."""
+    api = StubApi()  # brightness_pct = 80
+    app = LeproTUI(api=api)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("up")                  # optimistic 85, debounce pending
+        await app.refresh_state()                # poll returns stale 80
+        bar = app.query_one(StatusBar)
+        assert bar.state["brightness_pct"] == 85  # optimistic value preserved
+        # let the debounce fire so the test exits cleanly
+        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.3)
+
+
+@pytest.mark.asyncio
+async def test_poll_does_not_clobber_sent_brightness_until_echoed():
+    """After the POST fires but before the lamp echoes, polls keep the sent value."""
+    api = StubApi()  # brightness_pct = 80
+    app = LeproTUI(api=api)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("up")                  # optimistic 85
+        await pilot.pause(app.BRIGHTNESS_DEBOUNCE + 0.3)   # debounce fires, POST sent
+        assert ("set_brightness", 85) in api.calls
+        await app.refresh_state()                # poll still returns stale 80
+        bar = app.query_one(StatusBar)
+        assert bar.state["brightness_pct"] == 85  # sent value preserved
+        # now the "lamp" catches up
+        api.state = make_state(brightness_pct=85)
+        await app.refresh_state()
+        assert app.query_one(StatusBar).state["brightness_pct"] == 85
+        # and a later, different server value is accepted again (guard released)
+        api.state = make_state(brightness_pct=30)
+        await app.refresh_state()
+        assert app.query_one(StatusBar).state["brightness_pct"] == 30

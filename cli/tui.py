@@ -210,6 +210,7 @@ class LeproTUI(App):
         self.lamp_state: dict = {}
         self._pending_brightness: int | None = None
         self._brightness_timer = None
+        self._sent_brightness: int | None = None
 
     def compose(self) -> ComposeResult:
         yield StatusBar()
@@ -238,6 +239,15 @@ class LeproTUI(App):
             bar.unreachable = True
             return
         bar.unreachable = False
+        # Don't let a stale poll clobber an optimistic brightness that hasn't
+        # been sent / echoed yet (mirrors cockpit.js pendingBrightness guard).
+        if self._pending_brightness is not None:
+            state = {**state, "brightness_pct": self.lamp_state.get("brightness_pct")}
+        elif self._sent_brightness is not None:
+            if state.get("brightness_pct") == self._sent_brightness:
+                self._sent_brightness = None    # server caught up
+            else:
+                state = {**state, "brightness_pct": self._sent_brightness}
         self.lamp_state = state
         bar.state = state
         viz = self.query_one(LampViz)
@@ -285,6 +295,7 @@ class LeproTUI(App):
         self._brightness_timer = None
         if pct is None:
             return
+        self._sent_brightness = pct
         result = await self.api.set_brightness(pct)
         self._notify_if_error(result)
         self.burst_refresh()
