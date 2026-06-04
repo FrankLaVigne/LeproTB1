@@ -271,6 +271,37 @@ def build_d50_from_leds(leds: list[str | None], effect: str, speed: int) -> str:
     return f"N01:P1000{n_groups}{colors}F21000{n_groups}{lengths}U3V3{tail};"
 
 
+def scale_hex(hex6: str, pct: int) -> str:
+    """Scale an RGB hex color by a brightness percentage, linear per channel.
+
+    pct=0 returns "000000"; pct=100 returns the (uppercased) input unchanged.
+    Each channel is scaled by pct/100 and rounded. pct is clamped to 0..100.
+    A leading '#' is tolerated. Raises ValueError if the input isn't 6 hex chars.
+    """
+    h = hex6.lstrip("#")
+    if not _HEX6.match(h):
+        raise ValueError(f"{hex6!r} is not a 6-hex color string")
+    p = max(0, min(100, int(pct)))
+    r = int(round(int(h[0:2], 16) * p / 100))
+    g = int(round(int(h[2:4], 16) * p / 100))
+    b = int(round(int(h[4:6], 16) * p / 100))
+    return f"{r:02X}{g:02X}{b:02X}"
+
+
+def build_ring_leds(outer: dict, middle: dict, inner: dict) -> list[str]:
+    """Build a 196-entry LED list from three {color, bright} ring specs.
+
+    Per-ring brightness is baked into the RGB via scale_hex. Layout:
+    88 outer + 62 middle + 46 inner = 196.
+    """
+    leds: list[str] = []
+    for spec, count in ((outer, 88), (middle, 62), (inner, 46)):
+        color = scale_hex(spec["color"], spec["bright"])
+        leds.extend([color] * count)
+    assert len(leds) == 196, f"ring list must be 196, got {len(leds)}"
+    return leds
+
+
 async def _run_preview(preset: dict, did: str, client) -> None:
     """Cycle the preset's frames on the lamp until cancelled.
 
@@ -1127,6 +1158,7 @@ _SHELL_TEMPLATE = """<!doctype html>
       <a href="/clock" {cls_clock}>&#x23F0; Clock</a>
       <a href="/animations" {cls_animations}>&#x1F39E;&#xFE0F; Animations</a>
       <a href="/motions" {cls_motions}>&#x1F300; Motions</a>
+      <a href="/rings" {cls_rings}>&#x1F48D; Rings</a>
     </nav>
     <section class="panel">
 {panel}
@@ -1153,6 +1185,7 @@ def _render_shell(active: str, panel_html: str, title: str) -> str:
         "clock": "",
         "animations": "",
         "motions": "",
+        "rings": "",
     }
     if active not in active_classes:
         raise ValueError(f"unknown tab {active!r}; expected one of {list(active_classes)}")
@@ -1166,6 +1199,7 @@ def _render_shell(active: str, panel_html: str, title: str) -> str:
         cls_clock=active_classes["clock"],
         cls_animations=active_classes["animations"],
         cls_motions=active_classes["motions"],
+        cls_rings=active_classes["rings"],
     )
 
 
@@ -1195,6 +1229,11 @@ async def index(_req):
 
 async def index_diy(_req):
     return web.Response(text=_render_shell("diy", _PANEL_DIY, "DIY"),
+                        content_type="text/html")
+
+
+async def index_rings(_req):
+    return web.Response(text=_render_shell("rings", _PANEL_RINGS, "Rings"),
                         content_type="text/html")
 
 
@@ -1408,6 +1447,169 @@ $('#stop-btn').onclick = async () => {
 
 refresh();
 setInterval(refresh, 5000);
+</script>
+"""
+
+
+_PANEL_RINGS = """
+<style>
+  /* Feature-specific styles for the Rings panel.
+     Generic page chrome lives in /static/cockpit.css.
+     Classes prefixed .rings- to avoid collisions with other panels. */
+  h2 { font-size: 12px; margin: 0 0 8px; color: #aaa;
+       text-transform: uppercase; letter-spacing: 0.08em; }
+  .rings-color-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .rings-color-row input[type=color] { width: 44px; height: 44px; border: 2px solid #444;
+                                       border-radius: 50%; cursor: pointer; background: none; }
+  .rings-swatch { width: 28px; height: 28px; border-radius: 50%;
+                  border: 2px solid #333; cursor: pointer; }
+  .rings-swatch:hover { border-color: #5fd9d9; }
+  .rings-slider-row { display: flex; align-items: center; gap: 10px; margin: 12px 0 2px; }
+  .rings-slider-row .icon { width: 22px; text-align: center; }
+  .rings-slider-row input[type=range] { flex: 1; }
+  .rings-slider-row .val { min-width: 38px; text-align: right;
+                           font: 13px ui-monospace, monospace; color: #aaa; }
+  #status { font-size: 12px; color: #777; margin-top: 8px; min-height: 1.2em; }
+</style>
+
+  <div class="card rings-ring" data-ring="outer">
+    <h2>Outer Ring</h2>
+    <div class="rings-color-row">
+      <input type="color" class="rings-picker" value="#ffffff">
+      <div class="rings-swatch" style="background:#FF0000" data-hex="FF0000"></div>
+      <div class="rings-swatch" style="background:#FF8000" data-hex="FF8000"></div>
+      <div class="rings-swatch" style="background:#FFFF00" data-hex="FFFF00"></div>
+      <div class="rings-swatch" style="background:#00C000" data-hex="00C000"></div>
+      <div class="rings-swatch" style="background:#00FFFF" data-hex="00FFFF"></div>
+      <div class="rings-swatch" style="background:#0000FF" data-hex="0000FF"></div>
+      <div class="rings-swatch" style="background:#8000FF" data-hex="8000FF"></div>
+      <div class="rings-swatch" style="background:#FFFFFF" data-hex="FFFFFF"></div>
+    </div>
+    <div class="rings-slider-row">
+      <span class="icon">&#x2600;</span>
+      <input type="range" class="rings-bright" min="0" max="100" value="100">
+      <span class="val rings-bright-val">100</span>
+    </div>
+  </div>
+
+  <div class="card rings-ring" data-ring="middle">
+    <h2>Middle Ring</h2>
+    <div class="rings-color-row">
+      <input type="color" class="rings-picker" value="#ffffff">
+      <div class="rings-swatch" style="background:#FF0000" data-hex="FF0000"></div>
+      <div class="rings-swatch" style="background:#FF8000" data-hex="FF8000"></div>
+      <div class="rings-swatch" style="background:#FFFF00" data-hex="FFFF00"></div>
+      <div class="rings-swatch" style="background:#00C000" data-hex="00C000"></div>
+      <div class="rings-swatch" style="background:#00FFFF" data-hex="00FFFF"></div>
+      <div class="rings-swatch" style="background:#0000FF" data-hex="0000FF"></div>
+      <div class="rings-swatch" style="background:#8000FF" data-hex="8000FF"></div>
+      <div class="rings-swatch" style="background:#FFFFFF" data-hex="FFFFFF"></div>
+    </div>
+    <div class="rings-slider-row">
+      <span class="icon">&#x2600;</span>
+      <input type="range" class="rings-bright" min="0" max="100" value="100">
+      <span class="val rings-bright-val">100</span>
+    </div>
+  </div>
+
+  <div class="card rings-ring" data-ring="inner">
+    <h2>Inner Ring</h2>
+    <div class="rings-color-row">
+      <input type="color" class="rings-picker" value="#ffffff">
+      <div class="rings-swatch" style="background:#FF0000" data-hex="FF0000"></div>
+      <div class="rings-swatch" style="background:#FF8000" data-hex="FF8000"></div>
+      <div class="rings-swatch" style="background:#FFFF00" data-hex="FFFF00"></div>
+      <div class="rings-swatch" style="background:#00C000" data-hex="00C000"></div>
+      <div class="rings-swatch" style="background:#00FFFF" data-hex="00FFFF"></div>
+      <div class="rings-swatch" style="background:#0000FF" data-hex="0000FF"></div>
+      <div class="rings-swatch" style="background:#8000FF" data-hex="8000FF"></div>
+      <div class="rings-swatch" style="background:#FFFFFF" data-hex="FFFFFF"></div>
+    </div>
+    <div class="rings-slider-row">
+      <span class="icon">&#x2600;</span>
+      <input type="range" class="rings-bright" min="0" max="100" value="100">
+      <span class="val rings-bright-val">100</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div id="status"></div>
+  </div>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+// Per-ring state; defaults: white @ 100% for all three rings.
+const state = {
+  outer:  {color: 'FFFFFF', bright: 100},
+  middle: {color: 'FFFFFF', bright: 100},
+  inner:  {color: 'FFFFFF', bright: 100},
+};
+
+async function api(path, body) {
+  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
+                              body: JSON.stringify(body)});
+  if (!r.ok) {
+    let err = 'HTTP ' + r.status;
+    try { const j = await r.json(); if (j && j.error) err = j.error; } catch (e) {}
+    $('#status').textContent = 'error: ' + err;
+    return {ok: false, error: err};
+  }
+  const j = await r.json();
+  if (!j.ok) $('#status').textContent = 'error: ' + j.error;
+  else $('#status').textContent = '';
+  return j;
+}
+
+let throttled = false, pending = false;
+async function pushRings() {
+  pending = true;
+  if (throttled) return;
+  throttled = true;
+  pending = false;
+  await api('/api/rings', {outer: state.outer, middle: state.middle, inner: state.inner});
+  setTimeout(async () => {
+    throttled = false;
+    if (pending) {
+      pending = false;
+      await api('/api/rings', {outer: state.outer, middle: state.middle, inner: state.inner});
+    }
+  }, 100);
+}
+
+for (const card of $$('.rings-ring')) {
+  const ring = card.dataset.ring;
+  const picker = card.querySelector('.rings-picker');
+  const bright = card.querySelector('.rings-bright');
+  const brightVal = card.querySelector('.rings-bright-val');
+
+  picker.value = '#' + state[ring].color;
+  bright.value = state[ring].bright;
+  brightVal.textContent = state[ring].bright;
+
+  picker.oninput = e => {
+    state[ring].color = e.target.value.replace('#', '').toUpperCase();
+    pushRings();
+  };
+  for (const sw of card.querySelectorAll('.rings-swatch')) sw.onclick = () => {
+    state[ring].color = sw.dataset.hex;
+    picker.value = '#' + state[ring].color;
+    pushRings();
+  };
+  bright.oninput = e => {
+    const v = parseInt(e.target.value, 10);
+    state[ring].bright = v;
+    brightVal.textContent = v;
+    pushRings();
+  };
+}
+
+$('#pwr-on').onclick = () => api('/api/power', {on: true});
+$('#pwr-off').onclick = () => api('/api/power', {on: false});
+
+// Push the default white@100% state on open.
+pushRings();
 </script>
 """
 
@@ -1911,6 +2113,39 @@ async def api_diy_paint(req):
         if not 0 <= speed <= 100:
             raise ValueError(f"speed must be 0..100, got {speed}")
         d50 = build_d50_from_leds(apply_lamp_rotation(leds), effect, speed)
+        await _client.send_raw({"d1": 1, "d2": 2, "d50": d50})
+        return web.json_response({"ok": True})
+    except web.HTTPConflict:
+        raise
+    except (LeproError, ValueError, KeyError, TypeError) as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+def _validate_ring_spec(name: str, spec) -> None:
+    if not isinstance(spec, dict):
+        raise ValueError(f"{name} ring must be an object with color and bright")
+    color = spec.get("color")
+    if not (isinstance(color, str) and _HEX6.match(color.lstrip("#"))):
+        raise ValueError(f"{name} color {color!r} is not a 6-hex string")
+    bright = spec.get("bright")
+    if not (isinstance(bright, int) and not isinstance(bright, bool)
+            and 0 <= bright <= 100):
+        raise ValueError(f"{name} bright must be an int 0..100, got {bright!r}")
+
+
+async def api_rings(req):
+    try:
+        body = await req.json()
+        _check_ticker_mutex()
+        _check_clock_mutex()
+        _check_capture_mutex()
+        await _stop_preview()
+        for ring in ("outer", "middle", "inner"):
+            if ring not in body:
+                raise ValueError(f"missing {ring} ring")
+            _validate_ring_spec(ring, body[ring])
+        leds = build_ring_leds(body["outer"], body["middle"], body["inner"])
+        d50 = build_d50_from_leds(leds, "Steady", 50)
         await _client.send_raw({"d1": 1, "d2": 2, "d50": d50})
         return web.json_response({"ok": True})
     except web.HTTPConflict:
@@ -2782,6 +3017,8 @@ def build_app() -> web.Application:
         # check counts them). The HTML route stays a no-op until Task 5 lands.
         web.post("/api/diy/paint", api_diy_paint),
         web.post("/api/diy/save", api_diy_save),
+        web.get("/rings", index_rings),
+        web.post("/api/rings", api_rings),
         web.post("/api/brightness", api_brightness),
         web.post("/api/ticker/start", api_ticker_start),
         web.post("/api/ticker/stop", api_ticker_stop),
