@@ -161,7 +161,19 @@ most recent direction (or the failure state).
 .venv/bin/python -m web.server        # serves on 0.0.0.0:8081
 ```
 
-Open `http://<vm-ip>:8081`. The interface is a single "cockpit" layout:
+Open `http://<vm-ip>:8081`.
+
+### Run in Docker
+
+```bash
+docker-compose up -d --build      # starts on boot (restart: unless-stopped)
+docker-compose restart            # pick up code changes
+docker logs -f lepro-web
+```
+
+The image holds only Python + deps; the project directory is mounted at `/app`,
+so `config.json`, `certs/`, `presets/`, `motions.json` and `animations.json`
+stay on the host. Stop any non-Docker `web.server` first (both want port 8081). The interface is a single "cockpit" layout:
 
 - **Left panel (always visible):** the lamp visualizer (live 3-ring SVG of
   what the lamp is currently showing), the active-mode banner (Idle / Off /
