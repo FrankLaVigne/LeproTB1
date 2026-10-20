@@ -3,6 +3,8 @@
 Drives up to 3 Yahoo Finance symbols against the lamp's three concentric rings.
 Each ring shows its symbol's most-recent direction as a solid color; every
 tick triggers a 5-second whole-lamp Breathe flash in the new color.
+
+In ``whole_lamp`` mode a single symbol drives all three rings at once.
 """
 
 from __future__ import annotations
@@ -119,16 +121,19 @@ class TickerSession:
 
     _VALID_RINGS = ("outer", "middle", "inner")
 
-    def __init__(self, client, symbols, interval):
+    def __init__(self, client, symbols, interval, whole_lamp=False):
         if interval not in (10, 30, 60, 300):
             raise ValueError(f"interval must be 10, 30, 60, or 300; got {interval}")
         if not symbols:
             raise ValueError("at least one symbol required")
+        if whole_lamp and len(symbols) != 1:
+            raise ValueError("whole-lamp mode takes exactly one symbol")
         for ring in symbols:
             if ring not in self._VALID_RINGS:
                 raise ValueError(f"unknown ring {ring!r}")
         self._client = client
         self._interval = interval
+        self._whole_lamp = whole_lamp
         self._since: Optional[str] = None
         self._flash_until: Optional[str] = None
         self._task = None
@@ -181,6 +186,7 @@ class TickerSession:
             "running": self.running,
             "since": self._since,
             "interval": self._interval,
+            "whole_lamp": self._whole_lamp,
             "flash_until": self._flash_until,
             "rings": {k: copy.deepcopy(v) for k, v in self._rings.items()},
         }
@@ -257,7 +263,13 @@ class TickerSession:
             pass
 
     def _snapshot_rings_for_d50(self):
-        """build_ticker_d50 expects every ring slot present; substitute black."""
+        """build_ticker_d50 expects every ring slot present; substitute black.
+
+        In whole-lamp mode the one configured ring's color fills every slot.
+        """
+        if self._whole_lamp:
+            only = next(r for r in self._rings.values() if r is not None)
+            return {ring: {"color": only["color"]} for ring in self._VALID_RINGS}
         return {
             ring: (self._rings[ring] if self._rings[ring] is not None
                    else {"color": COLOR_OFF})

@@ -1276,7 +1276,27 @@ _PANEL_TICKER = """
   .dot { width: 14px; height: 14px; border-radius: 50%;
          background: #333; border: 1px solid #444; }
   .meta { font-size: 12px; color: #888; }
+  body.ticker-single .ticker-ring[data-ring=outer],
+  body.ticker-single .ticker-ring[data-ring=middle],
+  body.ticker-single .ticker-ring[data-ring=inner],
+  body:not(.ticker-single) .ticker-ring[data-ring=single] { display: none; }
 </style>
+
+  <div class="card">
+    <h2 style="margin:0 0 8px;font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.08em">Track</h2>
+    <div class="ticker-intervals" id="modes">
+      <button data-mode="rings" class="active">Three rings</button>
+      <button data-mode="single">One stock</button>
+    </div>
+  </div>
+
+  <div class="card ticker-ring" data-ring="single">
+    <div class="ring-head"><h2>Whole lamp</h2><div class="dot"></div></div>
+    <input type="text" placeholder="AAPL" maxlength="12">
+    <div class="ticker-price">&mdash;</div>
+    <div class="meta">no symbol</div>
+    <div class="ticker-history"></div>
+  </div>
 
   <div class="card ticker-ring" data-ring="outer">
     <div class="ring-head"><h2>Outer</h2><div class="dot"></div></div>
@@ -1321,7 +1341,17 @@ _PANEL_TICKER = """
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 
-const state = { interval: 30, running: false };
+const state = { interval: 30, running: false, mode: 'rings' };
+
+function setMode(m) {
+  state.mode = m;
+  document.body.classList.toggle('ticker-single', m === 'single');
+  for (const b of $$('#modes button')) b.classList.toggle('active', b.dataset.mode === m);
+}
+
+for (const b of $$('#modes button')) {
+  b.onclick = () => { if (!state.running) setMode(b.dataset.mode); };
+}
 
 function setActiveInterval(v) {
   state.interval = v;
@@ -1337,6 +1367,7 @@ for (const b of $$('#intervals button')) {
 function setInputsReadonly(ro) {
   for (const inp of $$('.ticker-ring input[type=text]')) inp.readOnly = ro;
   for (const b of $$('#intervals button')) b.disabled = ro;
+  for (const b of $$('#modes button')) b.disabled = ro;
 }
 
 async function postJSON(path, body) {
@@ -1414,8 +1445,13 @@ function renderState(s) {
     return;
   }
   if (s.interval) setActiveInterval(s.interval);
-  for (const ring of ['outer', 'middle', 'inner']) {
-    renderRing(ring, s.rings ? s.rings[ring] : null);
+  setMode(s.whole_lamp ? 'single' : 'rings');
+  if (s.whole_lamp) {
+    renderRing('single', s.rings ? s.rings.outer : null);
+  } else {
+    for (const ring of ['outer', 'middle', 'inner']) {
+      renderRing(ring, s.rings ? s.rings[ring] : null);
+    }
   }
   $('#status').textContent = `running since ${s.since ? s.since.slice(11, 16) : '?'}`;
 }
@@ -1428,10 +1464,12 @@ async function refresh() {
 $('#start-btn').onclick = async () => {
   const body = {interval: state.interval};
   for (const card of $$('.ticker-ring')) {
+    const isSingle = card.dataset.ring === 'single';
+    if (isSingle !== (state.mode === 'single')) continue;
     const sym = card.querySelector('input').value.trim();
     if (sym) body[card.dataset.ring] = sym;
   }
-  if (!body.outer && !body.middle && !body.inner) {
+  if (!body.single && !body.outer && !body.middle && !body.inner) {
     $('#status').textContent = 'enter at least one symbol';
     return;
   }
@@ -2220,10 +2258,16 @@ async def api_ticker_start(req):
         body = await req.json()
         interval = int(body.get("interval", 30))
         symbols = {}
-        for ring in ("outer", "middle", "inner"):
-            sym = body.get(ring)
-            if sym is not None and str(sym).strip() != "":
-                symbols[ring] = str(sym).strip().upper()
+        # "single": one symbol drives the whole lamp (stored on the outer ring).
+        single = str(body.get("single") or "").strip().upper()
+        whole_lamp = bool(single)
+        if whole_lamp:
+            symbols["outer"] = single
+        else:
+            for ring in ("outer", "middle", "inner"):
+                sym = body.get(ring)
+                if sym is not None and str(sym).strip() != "":
+                    symbols[ring] = str(sym).strip().upper()
         if not symbols:
             return web.json_response(
                 {"ok": False, "error": "at least one symbol required"},
@@ -2257,7 +2301,8 @@ async def api_ticker_start(req):
                 status=400,
             )
         await _stop_preview()
-        sess = _ticker_mod.TickerSession(_client, symbols, interval)
+        sess = _ticker_mod.TickerSession(_client, symbols, interval,
+                                         whole_lamp=whole_lamp)
         for ring, price in baselines.items():
             sess.set_baseline(ring, price)
         await sess.start()
@@ -2283,7 +2328,7 @@ async def api_ticker_state(_req):
     if _ticker_session is None:
         return web.json_response({
             "running": False, "since": None, "interval": None,
-            "flash_until": None, "rings": None,
+            "whole_lamp": False, "flash_until": None, "rings": None,
         })
     return web.json_response(_ticker_session.snapshot())
 

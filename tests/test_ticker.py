@@ -570,3 +570,50 @@ async def test_tick_once_sends_breathe_multicolor_d50_when_fast_and_no_flash():
     # Multi-color palette: N>=2 (outer green vs middle/inner off). The
     # single-color flash form would be P10001<hex>.
     assert payload["d50"].startswith("N01:P10003") or payload["d50"].startswith("N01:P10002")
+
+
+# --- Whole-lamp (single stock) mode -------------------------------------------
+
+
+def test_whole_lamp_requires_exactly_one_symbol():
+    with pytest.raises(ValueError):
+        ticker.TickerSession(client=None,
+                             symbols={"outer": "AAPL", "inner": "IBM"},
+                             interval=30, whole_lamp=True)
+
+
+def test_whole_lamp_snapshot_reports_mode():
+    sess = ticker.TickerSession(client=None, symbols={"outer": "AAPL"},
+                                 interval=30, whole_lamp=True)
+    assert sess.snapshot()["whole_lamp"] is True
+    plain = ticker.TickerSession(client=None, symbols={"outer": "AAPL"},
+                                  interval=30)
+    assert plain.snapshot()["whole_lamp"] is False
+
+
+def test_whole_lamp_paints_all_rings_with_the_one_symbol_color():
+    sess = ticker.TickerSession(client=None, symbols={"outer": "AAPL"},
+                                 interval=30, whole_lamp=True)
+    sess.set_baseline("outer", 100.0)
+    rings = sess._snapshot_rings_for_d50()
+    assert {r["color"] for r in rings.values()} == {ticker.COLOR_WHITE}
+
+
+@pytest.mark.asyncio
+async def test_whole_lamp_steady_d50_matches_all_rings_same_color():
+    client = _FakeClient()
+    sess = ticker.TickerSession(client=client, symbols={"outer": "AAPL"},
+                                 interval=10, whole_lamp=True)
+    sess.set_baseline("outer", 100.0)
+
+    async def _poll():
+        return {"outer": 101.0}
+    sess._fetch_all = _poll  # type: ignore[assignment]
+    await sess._tick_once()
+    sess._flash_until = None  # flash expired
+    await sess._tick_once()
+
+    green = {"color": ticker.COLOR_GREEN}
+    expected = ticker.build_ticker_d50(
+        {"outer": green, "middle": green, "inner": green}, None)
+    assert client.sent[-1]["d50"] == expected
