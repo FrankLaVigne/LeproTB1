@@ -112,6 +112,19 @@ def fetch_price(symbol):
         return None
 
 
+def fetch_day_change(symbol):
+    """Latest price minus the previous session's close, or None on any error."""
+    try:
+        import yfinance as yf
+        info = yf.Ticker(symbol).fast_info
+        last, prev = info["last_price"], info["previous_close"]
+        if last is None or prev is None:
+            return None
+        return float(last) - float(prev)
+    except Exception:  # noqa: BLE001  — any yfinance / network error -> None
+        return None
+
+
 class TickerSession:
     """Holds per-ring state for one polling session.
 

@@ -11,7 +11,8 @@ services:
     ports:
       - "8081:8081"
     environment:
-      # Start a whole-lamp stock ticker on boot (blank to disable).
+      # Seed the daily schedule's stock + poll interval until schedule.json
+      # exists; after that, edit them in the Schedule tab or the TUI (key c).
       LEPRO_TICKER_AUTOSTART: "IBM"
       LEPRO_TICKER_INTERVAL: "30"   # seconds: 10, 30, 60, or 300
     volumes:

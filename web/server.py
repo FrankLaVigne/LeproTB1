@@ -420,13 +420,35 @@ async def api_motion_rename(req):
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
 
+async def _play_motion_entry(entry: dict, palette: list[str]) -> asyncio.Task:
+    """Run a catalog motion on the lamp in the preview slot; returns the task."""
+    global _preview_task, _preview_name, _preview_kind
+    d50 = entry["reference"]["d50"]
+    if palette and entry.get("recolorable", True):
+        d50 = _motions_mod.recolor(d50, palette)
+    # A single-payload pseudo-preset drives _run_preview exactly like a
+    # one-frame preset preview.
+    pseudo = {"name": entry.get("name") or entry["id"],
+              "payload": {"d1": 1, "d2": 2, "d50": d50}}
+    did = _client._dev(None).did
+    if _preview_task and not _preview_task.done():
+        _preview_task.cancel()
+        try:
+            await _preview_task
+        except asyncio.CancelledError:
+            pass
+    _preview_task = asyncio.create_task(_run_preview(pseudo, did, _client))
+    _preview_name = entry.get("name") or entry["id"]
+    _preview_kind = "motion"
+    return _preview_task
+
+
 async def api_motion_play(req):
     """Recolor a motion with the request palette and run it on the lamp.
 
     Reuses the preset-preview task slot, so the same mutex rules apply
     (409 while capture/clock/ticker runs; /api/stop stops it).
     """
-    global _preview_task, _preview_name, _preview_kind
     mid = req.match_info["id"]
     try:
         body = await req.json()
@@ -438,24 +460,8 @@ async def api_motion_play(req):
         if entry is None:
             return web.json_response(
                 {"ok": False, "error": f"motion {mid!r} not found"}, status=404)
-        d50 = entry["reference"]["d50"]
         palette = [c for c in (body.get("palette") or []) if c]
-        if palette and entry.get("recolorable", True):
-            d50 = _motions_mod.recolor(d50, palette)
-        # A single-payload pseudo-preset drives _run_preview exactly like a
-        # one-frame preset preview.
-        pseudo = {"name": entry.get("name") or entry["id"],
-                  "payload": {"d1": 1, "d2": 2, "d50": d50}}
-        did = _client._dev(None).did
-        if _preview_task and not _preview_task.done():
-            _preview_task.cancel()
-            try:
-                await _preview_task
-            except asyncio.CancelledError:
-                pass
-        _preview_task = asyncio.create_task(_run_preview(pseudo, did, _client))
-        _preview_name = entry.get("name") or entry["id"]
-        _preview_kind = "motion"
+        await _play_motion_entry(entry, palette)
         return web.json_response({"ok": True})
     except web.HTTPConflict:
         raise
@@ -2019,6 +2025,25 @@ async def api_preset(req):
         return web.json_response({"ok": False, "error": str(e)}, status=400)
 
 
+async def _stop_lamp_drivers() -> None:
+    """Stop the ticker, clock and preview — whatever is driving the lamp."""
+    global _ticker_session, _clock_session
+    if _ticker_session is not None and _ticker_session.running:
+        await _ticker_session.stop()
+    _ticker_session = None
+    if _clock_session is not None and _clock_session.running:
+        await _clock_session.stop()
+    _clock_session = None
+    await _stop_preview()
+
+
+async def _power_off_all() -> None:
+    """Spec: power-off stops the ticker (and every other driver) first."""
+    await _stop_lamp_drivers()
+    await _stop_capture()
+    await _client.power(False)
+
+
 async def api_power(req):
     """Turn the lamp on or off.
 
@@ -2026,21 +2051,13 @@ async def api_power(req):
     as /api/ticker/stop") so the next poll cannot re-assert d50 and silently
     undo the user's power-off. Power-on leaves the ticker state unchanged.
     """
-    global _ticker_session, _clock_session
     try:
         body = await req.json()
         on = bool(body.get("on"))
         if not on:
-            # Spec: power-off stops the ticker first.
-            if _ticker_session is not None and _ticker_session.running:
-                await _ticker_session.stop()
-                _ticker_session = None
-            if _clock_session is not None and _clock_session.running:
-                await _clock_session.stop()
-                _clock_session = None
-            await _stop_preview()
-            await _stop_capture()
-        await _client.power(on)
+            await _power_off_all()
+        else:
+            await _client.power(True)
         return web.json_response({"ok": True, "on": on})
     except (LeproError, ValueError, KeyError) as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
@@ -2292,29 +2309,6 @@ async def _start_ticker(symbols: dict, interval: int, whole_lamp: bool) -> dict:
     return baselines
 
 
-def _ticker_autostart_config(env) -> tuple[str, int] | None:
-    """(symbol, interval) from LEPRO_TICKER_AUTOSTART / LEPRO_TICKER_INTERVAL, or None."""
-    symbol = env.get("LEPRO_TICKER_AUTOSTART", "").strip().upper()
-    if not symbol:
-        return None
-    return symbol, int(env.get("LEPRO_TICKER_INTERVAL", "30"))
-
-
-async def _autostart_ticker(symbol: str, interval: int, retry_delay: float = 30.0) -> None:
-    """Start a whole-lamp ticker on boot, retrying until the first price fetch works
-    (the network may not be up yet). Gives up quietly if a ticker is already running."""
-    while True:
-        try:
-            await _start_ticker({"outer": symbol}, interval, whole_lamp=True)
-            _LOG.info("ticker autostarted: %s every %ss", symbol, interval)
-            return
-        except _TickerStartError as e:
-            if _ticker_session is not None and _ticker_session.running:
-                return
-            _LOG.warning("ticker autostart failed (retrying in %.0fs): %s", retry_delay, e)
-        await asyncio.sleep(retry_delay)
-
-
 async def api_ticker_start(req):
     try:
         body = await req.json()
@@ -2383,6 +2377,14 @@ async def api_lamp_state(_req):
 
 
 def _active_mode() -> dict:
+    """Active-mode banner, prefixed with 📅 while the daily schedule drives the lamp."""
+    mode = _lamp_active_mode()
+    if _scheduler is not None and _scheduler.driving():
+        mode = {**mode, "label": "\U0001F4C5 " + mode["label"]}
+    return mode
+
+
+def _lamp_active_mode() -> dict:
     """Compute the active-mode banner: ``{"mode": ..., "label": ...}``.
 
     mode is one of "capturing", "off", "clock", "ticker", "preset", "idle".
@@ -2454,6 +2456,9 @@ async def api_lamp_leds(_req):
                            if isinstance(raw_brightness, (int, float)) else None),
         "lamp_mode": {0: "white", 1: "rgb", 2: "segmented", 3: "effect"}.get(fields.get("d2")),
         "active": _active_mode(),
+        "schedule": ({k: v for k, v in _scheduler.status().items()
+                      if k in ("phase", "next_phase", "next_change_at")}
+                     if _scheduler is not None else None),
         "leds": lampview.fields_to_leds(fields),
         "fields": dict(fields),
         "polled_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -3048,6 +3053,93 @@ loadPresets();
 </script>"""
 
 
+# --- Daily schedule — see docs/superpowers/specs/2026-10-23-daily-schedule-design.md
+from web import scheduler as _scheduler_mod
+
+_scheduler: "_scheduler_mod.Scheduler | None" = None
+_SCHEDULE_PATH = _PROJECT_ROOT / "schedule.json"
+
+
+class _ServerDriver:
+    """LampDriver for the scheduler, built on the workshop's own helpers.
+
+    Handles are the objects driving the lamp: the TickerSession for the
+    ticker, the preview asyncio.Task for motions."""
+
+    async def start_ticker(self, symbol: str, interval: int) -> object:
+        await _stop_lamp_drivers()
+        await _start_ticker({"outer": symbol}, interval, whole_lamp=True)
+        return _ticker_session
+
+    async def play_motion(self, motion_id: str) -> object:
+        entry = _find_motion(_load_motion_catalog(), motion_id)
+        if entry is None:
+            raise LeproError(f"motion {motion_id!r} not found")
+        await _stop_lamp_drivers()
+        return await _play_motion_entry(entry, [])
+
+    async def solid(self, color: str) -> None:
+        await _stop_lamp_drivers()
+        d50 = build_d50_from_leds(apply_lamp_rotation([color] * 196), "Steady", 50)
+        await _client.send_raw({"d1": 1, "d2": 2, "d50": d50})
+
+    async def power_off(self) -> None:
+        await _power_off_all()
+
+    def owns(self, handle: object) -> bool:
+        if handle is None:
+            return False
+        if handle is _ticker_session:
+            return bool(_ticker_session.running)
+        if handle is _preview_task:
+            return not _preview_task.done()
+        return False
+
+    def capture_busy(self) -> bool:
+        # Running, or stopped with frames not yet saved/cancelled.
+        return _capture_session is not None
+
+    def motion_ids(self) -> list[str]:
+        try:
+            return [m["id"] for m in _load_motion_catalog()["motions"]]
+        except (OSError, ValueError, KeyError):
+            return []
+
+    def motion_name(self, motion_id: str) -> str:
+        try:
+            entry = _find_motion(_load_motion_catalog(), motion_id)
+        except (OSError, ValueError, KeyError):
+            entry = None
+        return (entry.get("name") or motion_id) if entry else motion_id
+
+    async def day_change(self, symbol: str) -> float | None:
+        return await asyncio.to_thread(_ticker_mod.fetch_day_change, symbol)
+
+    def last_ticker_color(self) -> str | None:
+        if _ticker_session is None:
+            return None
+        outer = (_ticker_session.snapshot().get("rings") or {}).get("outer") or {}
+        return outer.get("color")
+
+
+async def api_schedule_get(_req):
+    if _scheduler is None:
+        return web.json_response({"ok": False, "error": "schedule not running"}, status=503)
+    return web.json_response({"settings": _scheduler.settings, "status": _scheduler.status()})
+
+
+async def api_schedule_put(req):
+    if _scheduler is None:
+        return web.json_response({"ok": False, "error": "schedule not running"}, status=503)
+    try:
+        changes = await req.json()
+        if not isinstance(changes, dict):
+            raise ValueError("body: must be a JSON object of settings to change")
+        return web.json_response(await _scheduler.update(changes))
+    except ValueError as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
 async def _on_startup(app):
     global _client
     cfg = load_config()
@@ -3057,16 +3149,19 @@ async def _on_startup(app):
     await _client.login()
     await _client.connect_mqtt()
     app["listener"] = asyncio.create_task(_client.listen_forever())
-    autostart = _ticker_autostart_config(os.environ)
-    if autostart:
-        app["ticker_autostart"] = asyncio.create_task(_autostart_ticker(*autostart))
+    global _scheduler
+    _scheduler = _scheduler_mod.Scheduler(_ServerDriver(), _SCHEDULE_PATH, os.environ)
+    app["scheduler"] = asyncio.create_task(_scheduler.run())
     host = os.environ.get("LEPRO_WORKSHOP_HOST", "0.0.0.0")
     port = int(os.environ.get("LEPRO_WORKSHOP_PORT", "8081"))
     _LOG.info("workshop ready on http://%s:%s (LAN-only; no auth)", host, port)
 
 
 async def _on_cleanup(app):
-    global _preview_task, _client
+    global _preview_task, _client, _scheduler
+    if "scheduler" in app:
+        app["scheduler"].cancel()
+    _scheduler = None
     if _preview_task and not _preview_task.done():
         _preview_task.cancel()
         try:
@@ -3074,8 +3169,6 @@ async def _on_cleanup(app):
         except asyncio.CancelledError:
             pass
     app["listener"].cancel()
-    if "ticker_autostart" in app:
-        app["ticker_autostart"].cancel()
     if _client is not None:
         await _client.close()
     _client = None
@@ -3105,6 +3198,8 @@ def build_app() -> web.Application:
         web.post("/api/ticker/start", api_ticker_start),
         web.post("/api/ticker/stop", api_ticker_stop),
         web.get("/api/ticker/state", api_ticker_state),
+        web.get("/api/schedule", api_schedule_get),
+        web.put("/api/schedule", api_schedule_put),
         web.get("/api/lamp/state", api_lamp_state),
         web.get("/api/lamp/leds", api_lamp_leds),
         web.get("/api/cockpit/active", api_cockpit_active),
