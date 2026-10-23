@@ -76,7 +76,7 @@ stop, driven through the workshop server's HTTP API (start `web.server` first).
 ```
 
 Keys: `p` power · `↑`/`↓` brightness · `1`-`8` fill color · `s` stop ·
-`v` rings/strips view · `d` raw d-fields · `r` refresh · `q` quit.
+`v` rings/strips view · `d` raw d-fields · `c` schedule · `r` refresh · `q` quit.
 
 The visualizer decodes the lamp's reported `d50` (our N01 format), RGB mode
 (`d5`), and white mode (`d4`). Official-app animations (N02/N03 formats) show
@@ -155,13 +155,30 @@ In short: pulse means "something is moving"; solid green/red means "calm";
 yellow means "I can't see the price right now"; the color tells you the
 most recent direction (or the failure state).
 
-### Autostart on boot
+### Daily schedule
 
-The workshop server (`web.server`, and the Docker container) can start a
-whole-lamp ticker itself at boot: set `LEPRO_TICKER_AUTOSTART=IBM` and
-optionally `LEPRO_TICKER_INTERVAL=30` (10, 30, 60, or 300). If the first price
-fetch fails (network not up yet), it retries every 30 s. `docker-compose.yml`
-sets this to IBM every 30 s.
+The workshop server runs the lamp on a market-day schedule by itself:
+
+| When (ET) | Lamp |
+|---|---|
+| 9:30 on trading days | **opening bell** — a motion for 20 s |
+| 9:30–4:00 | **ticker** for one stock (IBM, every 30 s by default) |
+| 4:00 (1:00 on early-close days) | **closing bell** — a motion for 20 s |
+| next 15 min | **recap** — solid green/red for how the stock closed vs. yesterday |
+| until lights-out (22:30) | **evening** — a random motion from the library, a new one every 10 min |
+| lights-out → next open | **off** |
+
+Weekends and NYSE holidays are either off all day or evening-only from 16:00.
+After a 1pm early close the lamp is off until 16:00. Manual control always
+wins: pick a preset, paint DIY or switch off, and the schedule leaves the lamp
+alone until the next phase change.
+
+Edit every setting — stock, interval, bell motions and length, recap length,
+evening motions and rotation, lights-out, weekends — in the cockpit's
+**📅 Schedule** tab or the TUI (key `c`). Settings live in `schedule.json`
+(git-ignored); `LEPRO_TICKER_AUTOSTART` / `LEPRO_TICKER_INTERVAL` only seed the
+stock and interval until that file exists. API: `GET /api/schedule`,
+`PUT /api/schedule` with the fields to change.
 
 ## Web UI (cockpit)
 
