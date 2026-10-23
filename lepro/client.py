@@ -394,13 +394,16 @@ class LeproClient:
             except Exception:  # noqa: BLE001
                 pass
             self._mqtt = None
-        self._mqtt = aiomqtt.Client(
+        mqtt = aiomqtt.Client(
             hostname=self._mqtt_info["host"],
             port=int(self._mqtt_info["port"]),
             identifier=self._client_id,
             tls_context=self._ssl,
         )
-        await self._mqtt.__aenter__()
+        # Only keep the client once it's connected: a client whose __aenter__
+        # failed never signals disconnect, so listen() would block on it forever.
+        await mqtt.__aenter__()
+        self._mqtt = mqtt
         for d in self.devices:
             await self._mqtt.subscribe(f"le/{d.did}/prp/#")
         _LOG.info("MQTT connected to %s:%s", self._mqtt_info["host"], self._mqtt_info["port"])
@@ -448,12 +451,18 @@ class LeproClient:
         """Listen with automatic reconnect — for long-lived consumers (the web app)."""
         while True:
             await self.listen(on_update=on_update)
-            await asyncio.sleep(backoff)
-            try:
-                await self.connect_mqtt()
-            except Exception as e:  # noqa: BLE001
-                _LOG.warning("MQTT reconnect failed: %s", e)
-                await asyncio.sleep(backoff)
+            # Keep retrying until the broker is back (DNS/network blips can
+            # outlast a single attempt); back off up to a minute between tries.
+            delay = backoff
+            while True:
+                await asyncio.sleep(delay)
+                try:
+                    await self.connect_mqtt()
+                    break
+                except Exception as e:  # noqa: BLE001
+                    _LOG.warning("MQTT reconnect failed (retrying in %.0fs): %s",
+                                 min(delay * 2, 60.0), e)
+                    delay = min(delay * 2, 60.0)
 
     # ----- high-level commands ----------------------------------------------
 

@@ -198,6 +198,13 @@ These aren't bugs in your code; they're features of the territory:
 - **SSL client cert is required by MQTT.** You can't skip the cert dance.
   Make sure your `ssl.SSLContext` has CA + client cert + the bundled private
   key all loaded before `connect()`.
+- **Reconnect until it works, not once.** A long-lived listener *will* get
+  dropped (session conflict, broker restart, Wi-Fi blip). Retry with backoff
+  forever — a single retry that hits a transient DNS failure leaves you
+  silently dead. With `aiomqtt`, also never keep a client whose `__aenter__`
+  failed: its disconnect future never resolves, so `async for msg in
+  client.messages` blocks forever instead of raising. My lamp sat stuck on red
+  for ten hours because of exactly this.
 
 ---
 
