@@ -1,7 +1,7 @@
 # Daily Schedule — Design
 
 **Date:** 2026-10-23
-**Status:** Draft — awaiting approval (builder check done)
+**Status:** Approved 2026-10-23 (opening/closing bells added at Frank's request)
 
 ## Intent
 
@@ -20,8 +20,10 @@ editing files or restarting the container.
 
   | Phase | When (defaults) | Lamp does |
   |---|---|---|
-  | `market` | market open → close on trading days (9:30–16:00 ET) | whole-lamp ticker for the configured symbol/interval (today's behavior) |
-  | `recap` | first N minutes after the close (15) | solid green if the symbol closed up vs. the previous close, red if down, white if flat/unknown |
+  | `opening_bell` | first `bell_seconds` after the open (20 s) | power on, play the opening motion |
+  | `market` | rest of the session → close on trading days (9:30–16:00 ET) | whole-lamp ticker for the configured symbol/interval (today's behavior) |
+  | `closing_bell` | first `bell_seconds` after the close (20 s) | play the closing motion |
+  | `recap` | first N minutes after the close (15) | (after the closing bell) solid green if the symbol closed up vs. the previous close, red if down, white if flat/unknown |
   | `evening` | end of recap → lights-out | a random motion from the motion library, switching to a different random one every M minutes (10) |
   | `night` | lights-out → next market open (22:30) | lamp powered off |
 
@@ -41,6 +43,9 @@ editing files or restarting the container.
   | `symbol` | `"IBM"` |
   | `interval` (s; 10/30/60/300 — the ticker's allowed set) | `30` |
   | `recap_minutes` (0 disables recap) | `15` |
+  | `opening_motion` — motion id or `"random"` | `"random"` |
+  | `closing_motion` — motion id or `"random"` | `"random"` |
+  | `bell_seconds` (0 disables both bells) | `20` |
   | `evening_motions` — `"all"` or a list of motion ids | `"all"` |
   | `evening_rotate_minutes` | `10` |
   | `lights_out` (HH:MM) | `"22:30"` |
@@ -96,6 +101,11 @@ is driving the lamp first — ticker, clock, preview — as the existing endpoin
 - `market`: `_start_ticker({"outer": symbol}, interval, whole_lamp=True)`. Its
   first-price fetch may fail (network down at 9:30); retry like `_autostart_ticker`
   does today until it starts or the phase ends.
+- `opening_bell` / `closing_bell`: power on, play the configured motion (or a
+  random one from the whole catalog) in its reference colors via the
+  `api_motion_play` path; the phase ends after `bell_seconds`. Bells happen only
+  on trading days (no open, no bell). Early-close days ring the closing bell at
+  13:00. A motion id that no longer exists in the catalog falls back to random.
 - `recap`: stop the ticker, fetch today's close and previous close for the symbol,
   paint solid green/red/white. If the fetch fails, use the ticker's last tick
   direction; if there's none, white.
@@ -182,7 +192,7 @@ New tab `📅 Schedule` at `/schedule`, same shell and styling as the other tabs
 - Pure phase computation (`phase_at(now, settings, calendar)` → phase + next
   change) is the core and gets thorough table tests: trading day timeline, early
   close (gap until `evening_start`), holiday, weekend in both `non_trading_days`
-  modes, `recap_minutes=0`, lights-out after midnight (e.g. 00:30 — the night
+  modes, `recap_minutes=0`, `bell_seconds=0` (no bell phases), lights-out after midnight (e.g. 00:30 — the night
   phase spans midnight correctly), Friday evening into the weekend, DST change
   days, and rejected lights-out values.
 - Calendar tests against published NYSE holiday dates for 2025–2027.
