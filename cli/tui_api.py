@@ -44,7 +44,23 @@ class LampApi:
         async with s.get(f"{self.base_url}/api/lamp/leds", timeout=_GET_TIMEOUT) as r:
             return await r.json()
 
+    async def get_schedule(self) -> dict:
+        """GET /api/schedule — {"settings": {...}, "status": {...}}."""
+        s = await self._ensure()
+        async with s.get(f"{self.base_url}/api/schedule", timeout=_GET_TIMEOUT) as r:
+            return await r.json()
+
+    async def get_motions(self) -> list[dict]:
+        """The motion catalog entries (id, name, ...)."""
+        s = await self._ensure()
+        async with s.get(f"{self.base_url}/api/motions", timeout=_GET_TIMEOUT) as r:
+            return (await r.json()).get("motions", [])
+
     # --- writes ---------------------------------------------------------------
+
+    async def put_schedule(self, changes: dict) -> dict:
+        """PUT only the changed settings; errors come back as {"ok": False, ...}."""
+        return await self._send("PUT", "/api/schedule", changes)
 
     async def set_power(self, on: bool) -> dict:
         return await self._post("/api/power", {"on": bool(on)})
@@ -63,12 +79,15 @@ class LampApi:
         })
 
     async def _post(self, path: str, body: dict) -> dict:
-        """POST and return the JSON body, even on error statuses (409 mutex
+        return await self._send("POST", path, body)
+
+    async def _send(self, method: str, path: str, body: dict) -> dict:
+        """Send and return the JSON body, even on error statuses (409 mutex
         conflicts, 400 validation) — the TUI surfaces these as notifications
         rather than crashing."""
         s = await self._ensure()
-        async with s.post(f"{self.base_url}{path}", json=body,
-                          timeout=_POST_TIMEOUT) as r:
+        async with s.request(method, f"{self.base_url}{path}", json=body,
+                             timeout=_POST_TIMEOUT) as r:
             try:
                 return await r.json()
             except aiohttp.ContentTypeError:

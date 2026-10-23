@@ -31,7 +31,22 @@ async def stub_server():
         received["paint"] = await req.json()
         return web.json_response({"ok": True})
 
+    async def schedule_get(_req):
+        return web.json_response({"settings": {"lights_out": "22:30"}, "status": {"phase": "night"}})
+
+    async def schedule_put(req):
+        received["schedule"] = await req.json()
+        if "interval" in received["schedule"]:
+            return web.json_response({"ok": False, "error": "interval: bad"}, status=400)
+        return web.json_response({"settings": {"lights_out": "23:00"}, "status": {}})
+
+    async def motions(_req):
+        return web.json_response({"motions": [{"id": "m1", "name": "Swirl"}], "total": 1})
+
     app = web.Application()
+    app.router.add_get("/api/schedule", schedule_get)
+    app.router.add_put("/api/schedule", schedule_put)
+    app.router.add_get("/api/motions", motions)
     app.router.add_get("/api/lamp/leds", leds)
     app.router.add_post("/api/power", power)
     app.router.add_post("/api/brightness", brightness)
@@ -133,3 +148,47 @@ async def test_post_returns_error_dict_on_http_error_status():
     finally:
         await api.close()
         await server.close()
+
+
+@pytest.mark.asyncio
+async def test_get_schedule(stub_server):
+    server, _received = stub_server
+    api = LampApi(str(server.make_url("")))
+    try:
+        data = await api.get_schedule()
+        assert data["settings"]["lights_out"] == "22:30"
+    finally:
+        await api.close()
+
+
+@pytest.mark.asyncio
+async def test_put_schedule_sends_changes(stub_server):
+    server, received = stub_server
+    api = LampApi(str(server.make_url("")))
+    try:
+        data = await api.put_schedule({"lights_out": "23:00"})
+        assert received["schedule"] == {"lights_out": "23:00"}
+        assert data["settings"]["lights_out"] == "23:00"
+    finally:
+        await api.close()
+
+
+@pytest.mark.asyncio
+async def test_put_schedule_error_returns_dict(stub_server):
+    server, _received = stub_server
+    api = LampApi(str(server.make_url("")))
+    try:
+        data = await api.put_schedule({"interval": 7})
+        assert data == {"ok": False, "error": "interval: bad"}
+    finally:
+        await api.close()
+
+
+@pytest.mark.asyncio
+async def test_get_motions(stub_server):
+    server, _received = stub_server
+    api = LampApi(str(server.make_url("")))
+    try:
+        assert await api.get_motions() == [{"id": "m1", "name": "Swirl"}]
+    finally:
+        await api.close()

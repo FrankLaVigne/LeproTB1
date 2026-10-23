@@ -6,7 +6,8 @@ Run:
 
 The TUI never speaks MQTT itself — it drives the lamp through the workshop's
 HTTP API, exactly like the web cockpit does. Keys: p power, ↑/↓ brightness,
-s stop, 1-8 fill, v rings/strips view, d raw d-fields, r refresh, q quit.
+s stop, 1-8 fill, v rings/strips view, d raw d-fields, c schedule, r refresh,
+q quit.
 
 Design: docs/superpowers/specs/2026-06-02-lamp-tui-design.md
 """
@@ -28,6 +29,7 @@ from textual.widgets import Footer, Static
 
 from cli import tui_render
 from cli.tui_api import LampApi
+from cli.tui_schedule import ScheduleScreen, next_change_text
 
 DEFAULT_SERVER = os.environ.get("LEPRO_WORKSHOP_URL", "http://localhost:8081")
 
@@ -120,6 +122,9 @@ class StatusBar(Static):
         mode = s.get("lamp_mode") or "?"
         conn = ("⚠ server unreachable" if self.unreachable
                 else f"{self.server_url} · mode: {mode}")
+        nxt = next_change_text(s.get("schedule"))
+        if nxt and not self.unreachable:
+            conn += f" · {nxt}"
 
         text = Text()
         text.append(f" {glyph}   {label}   ", Style(bold=True))
@@ -195,6 +200,7 @@ class LeproTUI(App):
         Binding("s", "stop_all", "Stop"),
         Binding("v", "toggle_view", "View"),
         Binding("d", "toggle_fields", "Fields"),
+        Binding("c", "schedule", "Schedule"),
         Binding("r", "refresh_now", "Refresh"),
         Binding("q", "quit", "Quit"),
     ] + [
@@ -327,6 +333,10 @@ class LeproTUI(App):
     def action_toggle_view(self) -> None:
         viz = self.query_one(LampViz)
         viz.view = "strips" if viz.view == "rings" else "rings"
+
+    def action_schedule(self) -> None:
+        if not isinstance(self.screen, ScheduleScreen):
+            self.push_screen(ScheduleScreen(self.api))
 
     def action_toggle_fields(self) -> None:
         self.query_one(FieldsPanel).toggle_class("visible")

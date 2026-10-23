@@ -55,6 +55,30 @@ class StubApi:
     async def close(self):
         self.calls.append(("close",))
 
+    schedule = {
+        "settings": {"enabled": True, "symbol": "IBM", "interval": 30, "recap_minutes": 15,
+                     "opening_motion": "random", "closing_motion": "m1", "bell_seconds": 20,
+                     "evening_motions": "all", "evening_rotate_minutes": 10,
+                     "lights_out": "22:30", "non_trading_days": "evening",
+                     "evening_start": "16:00"},
+        "status": {"enabled": True, "phase": "market", "next_phase": "closing_bell",
+                   "next_change_at": "2026-10-27T16:00:00-04:00"},
+    }
+    put_reply = None
+
+    async def get_schedule(self):
+        self.calls.append(("get_schedule",))
+        return self.schedule
+
+    async def put_schedule(self, changes):
+        self.calls.append(("put_schedule", changes))
+        return self.put_reply or {"settings": {**self.schedule["settings"], **changes},
+                                  "status": self.schedule["status"]}
+
+    async def get_motions(self):
+        self.calls.append(("get_motions",))
+        return [{"id": "m1", "name": "Swirl"}, {"id": "m2", "name": None}]
+
 
 class UnreachableApi(StubApi):
     async def get_leds(self):
@@ -249,3 +273,83 @@ async def test_rejected_brightness_post_releases_guard():
         # Server still reports the real value (80); the display must accept it.
         await app.refresh_state()
         assert app.query_one(StatusBar).state["brightness_pct"] == 80
+
+
+# --- Schedule screen ----------------------------------------------------------
+
+from cli.tui_schedule import ScheduleScreen  # noqa: E402
+
+
+async def _open_schedule(pilot, app):
+    await pilot.pause()
+    await pilot.press("c")
+    await pilot.pause()
+    await pilot.pause()
+    assert isinstance(app.screen, ScheduleScreen)
+    return app.screen
+
+
+@pytest.mark.asyncio
+async def test_c_opens_schedule_screen_populated():
+    from textual.widgets import Input, Select, Switch
+    api = StubApi()
+    app = LeproTUI(api=api)
+    async with app.run_test(size=(100, 60)) as pilot:
+        screen = await _open_schedule(pilot, app)
+        assert screen.query_one("#lights_out", Input).value == "22:30"
+        assert screen.query_one("#symbol", Input).value == "IBM"
+        assert screen.query_one("#interval", Select).value == 30
+        assert screen.query_one("#closing_motion", Select).value == "m1"
+        assert screen.query_one("#all_motions", Switch).value is True
+
+
+@pytest.mark.asyncio
+async def test_schedule_save_sends_only_changed_fields():
+    from textual.widgets import Input
+    api = StubApi()
+    app = LeproTUI(api=api)
+    async with app.run_test(size=(100, 60)) as pilot:
+        screen = await _open_schedule(pilot, app)
+        screen.query_one("#lights_out", Input).value = "23:00"
+        await screen.action_save()
+        await pilot.pause()
+        assert ("put_schedule", {"lights_out": "23:00"}) in api.calls
+        assert not isinstance(app.screen, ScheduleScreen)
+
+
+@pytest.mark.asyncio
+async def test_schedule_error_keeps_screen_open():
+    from textual.widgets import Input
+    api = StubApi()
+    api.put_reply = {"ok": False, "error": "lights_out: must be after the evening starts"}
+    app = LeproTUI(api=api)
+    async with app.run_test(size=(100, 60)) as pilot:
+        screen = await _open_schedule(pilot, app)
+        screen.query_one("#lights_out", Input).value = "15:00"
+        await screen.action_save()
+        await pilot.pause()
+        assert isinstance(app.screen, ScheduleScreen)
+        assert any("lights_out" in n.message for n in app._notifications)
+
+
+@pytest.mark.asyncio
+async def test_schedule_escape_closes_without_put():
+    api = StubApi()
+    app = LeproTUI(api=api)
+    async with app.run_test(size=(100, 60)) as pilot:
+        await _open_schedule(pilot, app)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not isinstance(app.screen, ScheduleScreen)
+        assert not any(c[0] == "put_schedule" for c in api.calls)
+
+
+@pytest.mark.asyncio
+async def test_banner_shows_next_schedule_change():
+    api = StubApi(make_state(schedule={"phase": "market", "next_phase": "closing_bell",
+                                       "next_change_at": "2026-10-27T16:00:00-04:00"}))
+    app = LeproTUI(api=api)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        text = str(app.query_one(StatusBar).render())
+        assert "next: closing bell Tue 16:00" in text
