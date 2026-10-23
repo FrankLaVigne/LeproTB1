@@ -315,12 +315,24 @@ async def _run_preview(preset: dict, did: str, client) -> None:
     else:
         frames = [preset["payload"]]
         dur_ms = _DEFAULT_FRAME_DURATION_MS
+
+    async def send(frame):
+        payload = {"d1": 1}
+        payload.update({k: v for k, v in frame.items() if k != "duration_ms"})
+        try:
+            await client.send_raw(payload, did)
+        except Exception as e:  # noqa: BLE001 — MQTT drop: keep going, it reconnects
+            _LOG.warning("preview send failed: %s", e)
+
     try:
+        if len(frames) == 1:
+            # The lamp runs the animation itself; re-sending d1:1 would undo a
+            # power-off from the phone app or wall switch.
+            await send(frames[0])
+            await asyncio.Event().wait()
         while True:
             for frame in frames:
-                payload = {"d1": 1}
-                payload.update({k: v for k, v in frame.items() if k != "duration_ms"})
-                await client.send_raw(payload, did)
+                await send(frame)
                 await asyncio.sleep(dur_ms / 1000)
     except asyncio.CancelledError:
         pass
@@ -2278,18 +2290,8 @@ class _TickerStartError(Exception):
         self.status = status
 
 
-async def _start_ticker(symbols: dict, interval: int, whole_lamp: bool) -> dict:
-    """Fetch first-sample baselines and start the ticker session.
-
-    Shared by the HTTP API and boot-time autostart. Returns ring -> baseline
-    price; raises _TickerStartError (with an HTTP status) when it can't start.
-    """
-    global _ticker_session
-    if _ticker_session is not None and _ticker_session.running:
-        raise _TickerStartError("stock ticker already running", 409)
-    if _capture_session is not None and _capture_session.running:
-        raise _TickerStartError("a capture is in progress; save or cancel it first", 409)
-    # First-sample fetch for every symbol; if any return None, abort.
+async def _fetch_ticker_baselines(symbols: dict) -> dict:
+    """First-sample price for every ring's symbol; raises _TickerStartError if any fail."""
     results = await asyncio.gather(
         *[asyncio.to_thread(_ticker_mod.fetch_price, s) for s in symbols.values()]
     )
@@ -2302,6 +2304,23 @@ async def _start_ticker(symbols: dict, interval: int, whole_lamp: bool) -> dict:
             baselines[ring] = price
     if failed:
         raise _TickerStartError(f"could not fetch first price for: {', '.join(failed)}")
+    return baselines
+
+
+async def _start_ticker(symbols: dict, interval: int, whole_lamp: bool,
+                        baselines: dict | None = None) -> dict:
+    """Fetch first-sample baselines (unless given) and start the ticker session.
+
+    Shared by the HTTP API and the daily schedule. Returns ring -> baseline
+    price; raises _TickerStartError (with an HTTP status) when it can't start.
+    """
+    global _ticker_session
+    if _ticker_session is not None and _ticker_session.running:
+        raise _TickerStartError("stock ticker already running", 409)
+    if _capture_session is not None and _capture_session.running:
+        raise _TickerStartError("a capture is in progress; save or cancel it first", 409)
+    if baselines is None:
+        baselines = await _fetch_ticker_baselines(symbols)
     await _stop_preview()
     sess = _ticker_mod.TickerSession(_client, symbols, interval,
                                      whole_lamp=whole_lamp)
@@ -3070,8 +3089,12 @@ class _ServerDriver:
     ticker, the preview asyncio.Task for motions."""
 
     async def start_ticker(self, symbol: str, interval: int) -> object:
+        # Fetch first: a failed fetch (network down, bad symbol) must not
+        # stop whatever the user is running while the schedule retries.
+        symbols = {"outer": symbol}
+        baselines = await _fetch_ticker_baselines(symbols)
         await _stop_lamp_drivers()
-        await _start_ticker({"outer": symbol}, interval, whole_lamp=True)
+        await _start_ticker(symbols, interval, whole_lamp=True, baselines=baselines)
         return _ticker_session
 
     async def play_motion(self, motion_id: str) -> object:
@@ -3092,6 +3115,8 @@ class _ServerDriver:
     def owns(self, handle: object) -> bool:
         if handle is None:
             return False
+        if _client is not None and any(f.get("d1") == 0 for f in _client.state.values()):
+            return False  # switched off by hand (phone app, wall switch, cockpit)
         if handle is _ticker_session:
             return bool(_ticker_session.running)
         if handle is _preview_task:
@@ -3100,7 +3125,8 @@ class _ServerDriver:
 
     def capture_busy(self) -> bool:
         # Running, or stopped with frames not yet saved/cancelled.
-        return _capture_session is not None
+        return _capture_session is not None and bool(
+            _capture_session.running or _capture_session.frame_count > 0)
 
     def motion_ids(self) -> list[str]:
         try:
@@ -3219,7 +3245,7 @@ let loaded = null;
 
 function renderStatus(st) {
   const name = PHASES[st.phase] || st.phase;
-  const motion = st.current_motion ? ` — ${st.current_motion}` : '';
+  const motion = st.current_motion ? ` — ${esc(st.current_motion)}` : '';
   $('#sched-status').innerHTML = st.enabled
     ? `<span class="phase">${name}</span>${motion}<br>`
       + `<span class="muted">next: ${PHASES[st.next_phase] || '—'} at ${fmt(st.next_change_at)}</span>`
@@ -3260,6 +3286,15 @@ function syncMotionList() {
   $('#sched-motions').classList.toggle('disabled', $('#f-all-motions').checked);
 }
 
+const num = v => v.trim() === '' ? v : Number(v);  // empty → let the server reject it
+
+function changedFields(values, saved) {
+  const out = {};
+  for (const [k, v] of Object.entries(values))
+    if (JSON.stringify(v) !== JSON.stringify(saved[k])) out[k] = v;
+  return out;
+}
+
 function readForm() {
   const f = $('#sched-form');
   const picked = [...document.querySelectorAll('#sched-motions input:checked')].map(i => i.value);
@@ -3269,9 +3304,9 @@ function readForm() {
     interval: Number(f.interval.value),
     opening_motion: f.opening_motion.value,
     closing_motion: f.closing_motion.value,
-    bell_seconds: Number(f.bell_seconds.value),
-    recap_minutes: Number(f.recap_minutes.value),
-    evening_rotate_minutes: Number(f.evening_rotate_minutes.value),
+    bell_seconds: num(f.bell_seconds.value),
+    recap_minutes: num(f.recap_minutes.value),
+    evening_rotate_minutes: num(f.evening_rotate_minutes.value),
     evening_motions: $('#f-all-motions').checked ? 'all' : picked,
     lights_out: f.lights_out.value,
     non_trading_days: f.non_trading_days.value,
@@ -3307,15 +3342,23 @@ async function boot() {
 $('#f-all-motions').addEventListener('change', syncMotionList);
 $('#sched-form').addEventListener('submit', async ev => {
   ev.preventDefault();
-  const body = readForm();
-  if (body.evening_motions !== 'all' && !body.evening_motions.length) {
+  const values = readForm();
+  if (values.evening_motions !== 'all' && !values.evening_motions.length) {
     message('pick at least one motion, or use all motions', true);
     return;
   }
+  // Only send what changed, so controls that failed to load (e.g. the motion
+  // list) can't overwrite saved choices.
+  const body = changedFields(values, loaded);
+  if (!motions.length) { delete body.opening_motion; delete body.closing_motion; }
+  if (!Object.keys(body).length) { message('nothing changed'); return; }
   message('saving…');
-  const r = await fetch('/api/schedule', {method: 'PUT',
-    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
-  const j = await r.json();
+  let r, j;
+  try {
+    r = await fetch('/api/schedule', {method: 'PUT',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    j = await r.json();
+  } catch (e) { message(`save failed: ${e}`, true); return; }
   if (!r.ok) { message(j.error || `HTTP ${r.status}`, true); return; }
   loaded = j.settings;
   renderStatus(j.status);
@@ -3348,6 +3391,9 @@ async def api_schedule_put(req):
         return web.json_response(await _scheduler.update(changes))
     except ValueError as e:
         return web.json_response({"ok": False, "error": str(e)}, status=400)
+    except OSError as e:
+        _LOG.error("could not save schedule: %s", e)
+        return web.json_response({"ok": False, "error": f"could not save: {e}"}, status=500)
 
 
 async def _on_startup(app):

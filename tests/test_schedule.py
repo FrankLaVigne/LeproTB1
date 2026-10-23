@@ -148,3 +148,9 @@ def test_load_corrupt_file_uses_defaults(tmp_path, caplog):
     p.write_text("{not json")
     assert sch.load_settings(p, {}) == sch.DEFAULTS
     assert "schedule.json" in caplog.text
+
+
+def test_load_unreadable_path_uses_defaults(tmp_path):
+    p = tmp_path / "schedule.json"
+    p.mkdir()  # IsADirectoryError on read
+    assert sch.load_settings(p, {}) == sch.DEFAULTS

@@ -281,3 +281,18 @@ async def test_run_loop_applies_and_wakes_on_update(tmp_path):
         assert d.names() == ["play_motion", "power_off"]
     finally:
         task.cancel()
+
+
+async def test_recap_falls_back_to_color_ticker_showed_before_the_bell(make):
+    class _RealisticDriver(FakeDriver):
+        async def play_motion(self, motion_id):
+            self.last_color = None  # stopping the ticker for the bell drops its session
+            return await super().play_motion(motion_id)
+
+    d = _RealisticDriver()
+    d.change = None
+    s, d, clock = make(at(2026, 10, 27, 15, 59, 50), driver=d)
+    await s.step()               # market
+    d.last_color = "FF0000"      # ticker is showing a downtick
+    await run_for(s, clock, 40)  # closing bell, then recap
+    assert d.calls[-1] == ("solid", "FF0000")

@@ -56,6 +56,7 @@ class Scheduler:
         self._motion_id: str | None = None
         self._rotating = False
         self._rotation_due: datetime | None = None
+        self._ticker_color: str | None = None  # last ticker color, for the recap fallback
         self._wake = asyncio.Event()
 
     # ----- loop ---------------------------------------------------------------
@@ -112,6 +113,9 @@ class Scheduler:
 
     async def _apply(self, phase: str, now: datetime) -> None:
         s = self.settings
+        if self._applied == "market":
+            # Read it now: the closing bell stops the ticker and drops its session.
+            self._ticker_color = self._driver.last_ticker_color()
         self._rotating = False
         self._handle = None
         self._motion_id = None
@@ -138,7 +142,7 @@ class Scheduler:
     async def _recap_color(self) -> str:
         change = await self._driver.day_change(self.settings["symbol"])
         if change is None:
-            last = self._driver.last_ticker_color()
+            last = self._ticker_color or self._driver.last_ticker_color()
             return last if last in (GREEN, RED) else WHITE
         return GREEN if change > 0 else RED if change < 0 else WHITE
 

@@ -149,6 +149,43 @@ async def test_run_preview_single_frame_publishes_once_then_idles():
 
 
 @pytest.mark.asyncio
+async def test_run_preview_single_frame_never_republishes(monkeypatch):
+    # The lamp runs the animation itself; re-sending d1:1 would undo a phone-app power-off.
+    monkeypatch.setattr(workshop, "_DEFAULT_FRAME_DURATION_MS", 10)
+    client = _FakeClient()
+    preset = {"payload": {"d1": 1, "d2": 2, "d50": "N01:P10001FF0000;"}}
+    task = asyncio.create_task(workshop._run_preview(preset, "abc", client))
+    await asyncio.sleep(0.1)
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    assert len(client.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_run_preview_survives_send_errors():
+    class _Flaky(_FakeClient):
+        async def send_raw(self, d, did=None):
+            self.calls.append((did, d))
+            if len(self.calls) == 1:
+                raise RuntimeError("MQTT not connected")
+
+    client = _Flaky()
+    preset = {"frame_duration_ms": 20, "frames": [{"d2": 2, "d50": "A;"}, {"d2": 2, "d50": "B;"}]}
+    task = asyncio.create_task(workshop._run_preview(preset, "abc", client))
+    await asyncio.sleep(0.15)
+    assert not task.done()
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    assert len(client.calls) >= 3
+
+
+@pytest.mark.asyncio
 async def test_run_preview_multi_frame_cycles_with_duration():
     client = _FakeClient()
     preset = {

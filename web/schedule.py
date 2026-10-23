@@ -114,7 +114,7 @@ def load_settings(path: Path, env: Mapping) -> dict:
     if path.exists():
         try:
             return validate(json.loads(path.read_text()))
-        except (ValueError, TypeError, AttributeError) as e:
+        except (ValueError, TypeError, AttributeError, OSError) as e:
             _LOG.warning("ignoring invalid %s (%s); using defaults", path.name, e)
     seed = dict(DEFAULTS)
     sym = env.get("LEPRO_TICKER_AUTOSTART", "").strip().upper()
