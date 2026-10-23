@@ -5,4 +5,5 @@ certs/
 __pycache__/
 *.pyc
 snapshot.json
+schedule.json
 .superpowers/
