@@ -2252,8 +2252,70 @@ def _check_ticker_mutex():
         )
 
 
-async def api_ticker_start(req):
+class _TickerStartError(Exception):
+    def __init__(self, msg: str, status: int = 400):
+        super().__init__(msg)
+        self.status = status
+
+
+async def _start_ticker(symbols: dict, interval: int, whole_lamp: bool) -> dict:
+    """Fetch first-sample baselines and start the ticker session.
+
+    Shared by the HTTP API and boot-time autostart. Returns ring -> baseline
+    price; raises _TickerStartError (with an HTTP status) when it can't start.
+    """
     global _ticker_session
+    if _ticker_session is not None and _ticker_session.running:
+        raise _TickerStartError("stock ticker already running", 409)
+    if _capture_session is not None and _capture_session.running:
+        raise _TickerStartError("a capture is in progress; save or cancel it first", 409)
+    # First-sample fetch for every symbol; if any return None, abort.
+    results = await asyncio.gather(
+        *[asyncio.to_thread(_ticker_mod.fetch_price, s) for s in symbols.values()]
+    )
+    baselines = {}
+    failed = []
+    for (ring, sym), price in zip(symbols.items(), results):
+        if price is None:
+            failed.append(sym)
+        else:
+            baselines[ring] = price
+    if failed:
+        raise _TickerStartError(f"could not fetch first price for: {', '.join(failed)}")
+    await _stop_preview()
+    sess = _ticker_mod.TickerSession(_client, symbols, interval,
+                                     whole_lamp=whole_lamp)
+    for ring, price in baselines.items():
+        sess.set_baseline(ring, price)
+    await sess.start()
+    _ticker_session = sess
+    return baselines
+
+
+def _ticker_autostart_config(env) -> tuple[str, int] | None:
+    """(symbol, interval) from LEPRO_TICKER_AUTOSTART / LEPRO_TICKER_INTERVAL, or None."""
+    symbol = env.get("LEPRO_TICKER_AUTOSTART", "").strip().upper()
+    if not symbol:
+        return None
+    return symbol, int(env.get("LEPRO_TICKER_INTERVAL", "30"))
+
+
+async def _autostart_ticker(symbol: str, interval: int, retry_delay: float = 30.0) -> None:
+    """Start a whole-lamp ticker on boot, retrying until the first price fetch works
+    (the network may not be up yet). Gives up quietly if a ticker is already running."""
+    while True:
+        try:
+            await _start_ticker({"outer": symbol}, interval, whole_lamp=True)
+            _LOG.info("ticker autostarted: %s every %ss", symbol, interval)
+            return
+        except _TickerStartError as e:
+            if _ticker_session is not None and _ticker_session.running:
+                return
+            _LOG.warning("ticker autostart failed (retrying in %.0fs): %s", retry_delay, e)
+        await asyncio.sleep(retry_delay)
+
+
+async def api_ticker_start(req):
     try:
         body = await req.json()
         interval = int(body.get("interval", 30))
@@ -2273,41 +2335,11 @@ async def api_ticker_start(req):
                 {"ok": False, "error": "at least one symbol required"},
                 status=400,
             )
-        if _ticker_session is not None and _ticker_session.running:
-            return web.json_response(
-                {"ok": False, "error": "stock ticker already running"},
-                status=409,
-            )
-        if _capture_session is not None and _capture_session.running:
-            return web.json_response(
-                {"ok": False, "error": "a capture is in progress; save or cancel it first"},
-                status=409,
-            )
-        import asyncio
-        # First-sample fetch for every symbol; if any return None, abort.
-        results = await asyncio.gather(
-            *[asyncio.to_thread(_ticker_mod.fetch_price, s) for s in symbols.values()]
-        )
-        baselines = {}
-        failed = []
-        for (ring, sym), price in zip(symbols.items(), results):
-            if price is None:
-                failed.append(sym)
-            else:
-                baselines[ring] = price
-        if failed:
-            return web.json_response(
-                {"ok": False, "error": f"could not fetch first price for: {', '.join(failed)}"},
-                status=400,
-            )
-        await _stop_preview()
-        sess = _ticker_mod.TickerSession(_client, symbols, interval,
-                                         whole_lamp=whole_lamp)
-        for ring, price in baselines.items():
-            sess.set_baseline(ring, price)
-        await sess.start()
-        _ticker_session = sess
-        snap = sess.snapshot()
+        try:
+            baselines = await _start_ticker(symbols, interval, whole_lamp)
+        except _TickerStartError as e:
+            return web.json_response({"ok": False, "error": str(e)}, status=e.status)
+        snap = _ticker_session.snapshot()
         return web.json_response(
             {"ok": True, "since": snap["since"], "baselines": baselines}
         )
@@ -3025,6 +3057,9 @@ async def _on_startup(app):
     await _client.login()
     await _client.connect_mqtt()
     app["listener"] = asyncio.create_task(_client.listen_forever())
+    autostart = _ticker_autostart_config(os.environ)
+    if autostart:
+        app["ticker_autostart"] = asyncio.create_task(_autostart_ticker(*autostart))
     host = os.environ.get("LEPRO_WORKSHOP_HOST", "0.0.0.0")
     port = int(os.environ.get("LEPRO_WORKSHOP_PORT", "8081"))
     _LOG.info("workshop ready on http://%s:%s (LAN-only; no auth)", host, port)
@@ -3039,6 +3074,8 @@ async def _on_cleanup(app):
         except asyncio.CancelledError:
             pass
     app["listener"].cancel()
+    if "ticker_autostart" in app:
+        app["ticker_autostart"].cancel()
     if _client is not None:
         await _client.close()
     _client = None

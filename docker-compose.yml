@@ -10,5 +10,9 @@ services:
     user: "1000:1000"
     ports:
       - "8081:8081"
+    environment:
+      # Start a whole-lamp stock ticker on boot (blank to disable).
+      LEPRO_TICKER_AUTOSTART: "IBM"
+      LEPRO_TICKER_INTERVAL: "30"   # seconds: 10, 30, 60, or 300
     volumes:
       - .:/app

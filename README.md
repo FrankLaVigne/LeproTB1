@@ -155,6 +155,14 @@ In short: pulse means "something is moving"; solid green/red means "calm";
 yellow means "I can't see the price right now"; the color tells you the
 most recent direction (or the failure state).
 
+### Autostart on boot
+
+The workshop server (`web.server`, and the Docker container) can start a
+whole-lamp ticker itself at boot: set `LEPRO_TICKER_AUTOSTART=IBM` and
+optionally `LEPRO_TICKER_INTERVAL=30` (10, 30, 60, or 300). If the first price
+fetch fails (network not up yet), it retries every 30 s. `docker-compose.yml`
+sets this to IBM every 30 s.
+
 ## Web UI (cockpit)
 
 ```bash
@@ -166,10 +174,20 @@ Open `http://<vm-ip>:8081`.
 ### Run in Docker
 
 ```bash
-docker-compose up -d --build      # starts on boot (restart: unless-stopped)
-docker-compose restart            # pick up code changes
+docker compose up -d --build      # starts on boot (restart: unless-stopped)
+docker compose restart            # pick up code changes
+docker compose up -d              # pick up docker-compose.yml changes (env vars)
 docker logs -f lepro-web
 ```
+
+Use Compose v2 (`docker compose`, e.g. `apt install docker-compose-v2`). The
+legacy Python `docker-compose` 1.x crashes with `KeyError: 'ContainerConfig'`
+on current Docker Engine when recreating the container — after it has already
+stopped and renamed the old one.
+
+If the MQTT connection to Lepro's cloud drops (phone app claims the session,
+network blip), the server reconnects on its own with backoff up to 60 s; look
+for `MQTT reconnect failed (retrying in …)` in the logs.
 
 The image holds only Python + deps; the project directory is mounted at `/app`,
 so `config.json`, `certs/`, `presets/`, `motions.json` and `animations.json`
