@@ -161,3 +161,22 @@ async def test_motions_page_renders_real_panel():
     assert "motion-grid" in text          # the real panel's grid container
     assert "Motions UI coming soon" not in text    # placeholder is gone
     assert "motion-rebuild" in text       # toolbar button present
+
+
+def test_render_shell_links_to_schedule_tab():
+    out = workshop._render_shell(active="presets", panel_html="", title="Presets")
+    assert 'href="/schedule"' in out
+
+
+def test_render_shell_marks_schedule_active():
+    out = workshop._render_shell(active="schedule", panel_html="", title="Schedule")
+    assert 'href="/schedule" class="active"' in out
+
+
+async def test_schedule_page_has_a_field_for_every_setting():
+    from web import schedule as sch
+    resp = await workshop.index_schedule(None)
+    text = resp.text if isinstance(resp.text, str) else resp.body.decode()
+    for key in sch.DEFAULTS:
+        assert f'name="{key}"' in text, key
+    assert "/api/schedule" in text

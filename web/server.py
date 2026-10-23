@@ -1165,6 +1165,7 @@ _SHELL_TEMPLATE = """<!doctype html>
       <a href="/animations" {cls_animations}>&#x1F39E;&#xFE0F; Animations</a>
       <a href="/motions" {cls_motions}>&#x1F300; Motions</a>
       <a href="/rings" {cls_rings}>&#x1F48D; Rings</a>
+      <a href="/schedule" {cls_schedule}>&#x1F4C5; Schedule</a>
     </nav>
     <section class="panel">
 {panel}
@@ -1192,6 +1193,7 @@ def _render_shell(active: str, panel_html: str, title: str) -> str:
         "animations": "",
         "motions": "",
         "rings": "",
+        "schedule": "",
     }
     if active not in active_classes:
         raise ValueError(f"unknown tab {active!r}; expected one of {list(active_classes)}")
@@ -1206,6 +1208,7 @@ def _render_shell(active: str, panel_html: str, title: str) -> str:
         cls_animations=active_classes["animations"],
         cls_motions=active_classes["motions"],
         cls_rings=active_classes["rings"],
+        cls_schedule=active_classes["schedule"],
     )
 
 
@@ -3122,6 +3125,213 @@ class _ServerDriver:
         return outer.get("color")
 
 
+_PANEL_SCHEDULE = """
+<style>
+  /* Schedule tab. Classes prefixed .sched- to avoid collisions. */
+  .sched-status { font-size: 15px; line-height: 1.6; }
+  .sched-status .phase { font-weight: 700; color: #5fd9d9; }
+  .sched-status .muted { color: #888; font-size: 13px; }
+  .sched-row { display: grid; grid-template-columns: 190px 1fr; align-items: center;
+               gap: 10px; margin: 8px 0; }
+  .sched-row label { font-size: 13px; color: #ccc; }
+  .sched-row input, .sched-row select { padding: 7px 9px; border-radius: 8px;
+               border: 1px solid #333; background: #1f1f23; color: #eee; font: inherit;
+               max-width: 220px; }
+  .sched-row input[type=checkbox] { width: 20px; height: 20px; }
+  .sched-help { font-size: 12px; color: #777; margin: -4px 0 8px 200px; }
+  .sched-motions { max-height: 220px; overflow-y: auto; border: 1px solid #333;
+                   border-radius: 8px; padding: 6px 10px; margin-top: 6px; }
+  .sched-motions label { display: block; font-size: 13px; color: #ccc; padding: 2px 0; }
+  .sched-motions.disabled { opacity: 0.4; pointer-events: none; }
+  .sched-controls { display: flex; gap: 8px; margin-top: 12px; }
+  .sched-controls button { flex: 1; padding: 12px; border: 0; border-radius: 10px;
+                           background: #2c8f4f; color: #fff; cursor: pointer;
+                           font: inherit; font-weight: 700; }
+  #sched-msg { font-size: 13px; margin-top: 10px; min-height: 1.2em; color: #777; }
+  #sched-msg.error { color: #ff6b6b; }
+  @media (max-width: 600px) {
+    .sched-row { grid-template-columns: 1fr; gap: 4px; }
+    .sched-help { margin-left: 0; }
+  }
+</style>
+
+  <div class="card">
+    <h2>Now</h2>
+    <div class="sched-status" id="sched-status">loading…</div>
+  </div>
+
+  <form id="sched-form" class="card">
+    <h2>Daily schedule</h2>
+    <div class="sched-row"><label for="f-enabled">Schedule on</label>
+      <input type="checkbox" id="f-enabled" name="enabled"></div>
+
+    <h2>Market hours (9:30–4:00 ET)</h2>
+    <div class="sched-row"><label for="f-symbol">Stock</label>
+      <input type="text" id="f-symbol" name="symbol" autocapitalize="characters"></div>
+    <div class="sched-row"><label for="f-interval">Check price every</label>
+      <select id="f-interval" name="interval">
+        <option value="10">10 s</option><option value="30">30 s</option>
+        <option value="60">1 min</option><option value="300">5 min</option>
+      </select></div>
+    <div class="sched-row"><label for="f-opening_motion">Opening bell</label>
+      <select id="f-opening_motion" name="opening_motion" class="motion-select"></select></div>
+    <div class="sched-row"><label for="f-closing_motion">Closing bell</label>
+      <select id="f-closing_motion" name="closing_motion" class="motion-select"></select></div>
+    <div class="sched-row"><label for="f-bell_seconds">Bell length (seconds)</label>
+      <input type="number" id="f-bell_seconds" name="bell_seconds" min="0" max="600"></div>
+    <div class="sched-help">0 turns both bells off.</div>
+    <div class="sched-row"><label for="f-recap_minutes">Close recap (minutes)</label>
+      <input type="number" id="f-recap_minutes" name="recap_minutes" min="0" max="360"></div>
+    <div class="sched-help">Solid green or red for how the stock closed. 0 skips it.</div>
+
+    <h2>Evening</h2>
+    <div class="sched-row"><label for="f-evening_rotate_minutes">New animation every (min)</label>
+      <input type="number" id="f-evening_rotate_minutes" name="evening_rotate_minutes" min="1" max="1440"></div>
+    <div class="sched-row"><label for="f-all-motions">Use all motions</label>
+      <input type="checkbox" id="f-all-motions" name="evening_motions"></div>
+    <div class="sched-motions" id="sched-motions"></div>
+    <div class="sched-row"><label for="f-lights_out">Lights out</label>
+      <input type="time" id="f-lights_out" name="lights_out"></div>
+
+    <h2>Weekends &amp; holidays</h2>
+    <div class="sched-row"><label for="f-non_trading_days">Lamp</label>
+      <select id="f-non_trading_days" name="non_trading_days">
+        <option value="evening">Evening animations</option>
+        <option value="off">Off all day</option>
+      </select></div>
+    <div class="sched-row"><label for="f-evening_start">Evening starts</label>
+      <input type="time" id="f-evening_start" name="evening_start"></div>
+    <div class="sched-help">Also when the evening starts after a 1pm early close.</div>
+
+    <div class="sched-controls"><button type="submit">Save</button></div>
+    <div id="sched-msg"></div>
+  </form>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const PHASES = {opening_bell: '🔔 Opening bell', market: '📈 Market open',
+  closing_bell: '🔔 Closing bell', recap: '🟩 Close recap', idle_off: '⏸ Off until evening',
+  evening: '🌀 Evening', night: '🌙 Night (off)'};
+const fmt = iso => iso ? new Date(iso).toLocaleString([], {weekday: 'short',
+  hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York'}) + ' ET' : '—';
+let motions = [];
+let loaded = null;
+
+function renderStatus(st) {
+  const name = PHASES[st.phase] || st.phase;
+  const motion = st.current_motion ? ` — ${st.current_motion}` : '';
+  $('#sched-status').innerHTML = st.enabled
+    ? `<span class="phase">${name}</span>${motion}<br>`
+      + `<span class="muted">next: ${PHASES[st.next_phase] || '—'} at ${fmt(st.next_change_at)}</span>`
+    : '<span class="phase">Schedule off</span><br><span class="muted">the lamp stays as you leave it</span>';
+}
+
+const esc = t => String(t).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;',
+  '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
+function motionLabel(m) { return esc(m.name || m.id); }
+
+function fillMotionControls(s) {
+  const sorted = [...motions].sort((a, b) =>
+    (!!b.name - !!a.name) || (a.name || a.id).localeCompare(b.name || b.id));
+  for (const sel of document.querySelectorAll('.motion-select')) {
+    sel.innerHTML = '<option value="random">Random</option>'
+      + sorted.map(m => `<option value="${esc(m.id)}">${motionLabel(m)}</option>`).join('');
+    sel.value = s[sel.name];
+    if (sel.value !== s[sel.name]) sel.value = 'random';
+  }
+  const chosen = new Set(Array.isArray(s.evening_motions) ? s.evening_motions : []);
+  $('#sched-motions').innerHTML = sorted.map(m =>
+    `<label><input type="checkbox" value="${esc(m.id)}" ${chosen.has(m.id) ? 'checked' : ''}> `
+    + `${motionLabel(m)}</label>`).join('') || '<em>no motions in the library yet</em>';
+}
+
+function fillForm(s) {
+  const f = $('#sched-form');
+  f.enabled.checked = s.enabled;
+  for (const k of ['symbol', 'interval', 'bell_seconds', 'recap_minutes',
+                   'evening_rotate_minutes', 'lights_out', 'non_trading_days', 'evening_start'])
+    f[k].value = s[k];
+  $('#f-all-motions').checked = s.evening_motions === 'all';
+  fillMotionControls(s);
+  syncMotionList();
+}
+
+function syncMotionList() {
+  $('#sched-motions').classList.toggle('disabled', $('#f-all-motions').checked);
+}
+
+function readForm() {
+  const f = $('#sched-form');
+  const picked = [...document.querySelectorAll('#sched-motions input:checked')].map(i => i.value);
+  return {
+    enabled: f.enabled.checked,
+    symbol: f.symbol.value.trim(),
+    interval: Number(f.interval.value),
+    opening_motion: f.opening_motion.value,
+    closing_motion: f.closing_motion.value,
+    bell_seconds: Number(f.bell_seconds.value),
+    recap_minutes: Number(f.recap_minutes.value),
+    evening_rotate_minutes: Number(f.evening_rotate_minutes.value),
+    evening_motions: $('#f-all-motions').checked ? 'all' : picked,
+    lights_out: f.lights_out.value,
+    non_trading_days: f.non_trading_days.value,
+    evening_start: f.evening_start.value,
+  };
+}
+
+function message(text, isError) {
+  $('#sched-msg').textContent = text;
+  $('#sched-msg').classList.toggle('error', !!isError);
+}
+
+async function refreshStatus() {
+  try {
+    const j = await fetch('/api/schedule').then(r => r.json());
+    if (j.status) renderStatus(j.status);
+  } catch (e) { /* server restarting; next poll retries */ }
+}
+
+async function boot() {
+  const [sched, cat] = await Promise.all([
+    fetch('/api/schedule').then(r => r.json()),
+    fetch('/api/motions').then(r => r.json()).catch(() => ({motions: []})),
+  ]);
+  if (!sched.settings) { message(sched.error || 'schedule unavailable', true); return; }
+  motions = cat.motions || [];
+  loaded = sched.settings;
+  fillForm(loaded);
+  renderStatus(sched.status);
+  setInterval(refreshStatus, 5000);
+}
+
+$('#f-all-motions').addEventListener('change', syncMotionList);
+$('#sched-form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const body = readForm();
+  if (body.evening_motions !== 'all' && !body.evening_motions.length) {
+    message('pick at least one motion, or use all motions', true);
+    return;
+  }
+  message('saving…');
+  const r = await fetch('/api/schedule', {method: 'PUT',
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) { message(j.error || `HTTP ${r.status}`, true); return; }
+  loaded = j.settings;
+  renderStatus(j.status);
+  message('saved');
+});
+
+boot();
+</script>
+"""
+
+
+async def index_schedule(_req):
+    return web.Response(text=_render_shell("schedule", _PANEL_SCHEDULE, "Schedule"),
+                        content_type="text/html")
+
+
 async def api_schedule_get(_req):
     if _scheduler is None:
         return web.json_response({"ok": False, "error": "schedule not running"}, status=503)
@@ -3198,6 +3408,7 @@ def build_app() -> web.Application:
         web.post("/api/ticker/start", api_ticker_start),
         web.post("/api/ticker/stop", api_ticker_stop),
         web.get("/api/ticker/state", api_ticker_state),
+        web.get("/schedule", index_schedule),
         web.get("/api/schedule", api_schedule_get),
         web.put("/api/schedule", api_schedule_put),
         web.get("/api/lamp/state", api_lamp_state),
